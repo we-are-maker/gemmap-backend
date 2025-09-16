@@ -1,0 +1,19 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: gemmap-api
+spec:
+  tls:
+    - hosts: [ "api-dev.gemmap.site" ]
+      secretName: gemmap-tls
+  rules:
+    - host: "api-dev.gemmap.site"
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: gemmap-service
+                port:
+                  number: 8080

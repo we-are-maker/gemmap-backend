@@ -1,0 +1,19 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: dev
+resources:
+  - ../../base
+  - configmap.yaml
+patches:
+  - path: deployment-replicas-patch.yaml
+    target:
+      kind: Deployment
+      name: gemmap-api
+  - path: deployment-imagepullsecret-patch.yaml
+    target:
+      kind: Deployment
+      name: gemmap-api
+  - path: ingress-patch.yaml
+    target:
+      kind: Ingress
+      name: gemmap-api
