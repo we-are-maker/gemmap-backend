@@ -91,13 +91,3 @@ jobs:
           set -eux
           docker push $REGISTRY/$IMAGE_NAME:dev-$SHA7
           docker push $REGISTRY/$IMAGE_NAME:dev-latest
-
-      - name: Trigger NHN Cloud Pipeline (dev)
-        env:
-          WEBHOOK_URL: ${{ secrets.NHN_WEBHOOK_URL_DEV }}
-          IMAGE_URI:   ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:dev-latest
-        run: |
-          set -eux
-          curl -X POST -H "Content-Type: application/json" \
-            -d '{"ref":"develop","image":"'"$IMAGE_URI"'"}' \
-            "$WEBHOOK_URL"
