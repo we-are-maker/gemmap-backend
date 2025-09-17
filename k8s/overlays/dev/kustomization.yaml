@@ -13,6 +13,10 @@ patches:
     target:
       kind: Deployment
       name: gemmap-api
+  - path: deployment-secret-patch.yaml
+    target:
+      kind: Deployment
+      name: gemmap-api
   - path: ingress-patch.yaml
     target:
       kind: Ingress
