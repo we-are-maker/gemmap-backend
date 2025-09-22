@@ -3,6 +3,8 @@ kind: Deployment
 metadata:
   name: gemmap-api
   labels: { app: gemmap-api }
+  annotations:
+    traffic.spinnaker.io/load-balancers: '["service gemmap-service"]'
 spec:
   replicas: 1  # dev 오버레이에서 패치로 덮어씀
   selector:
