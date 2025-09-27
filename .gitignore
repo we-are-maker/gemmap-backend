@@ -1,4 +1,5 @@
 HELP.md
+SECRETS.md
 .gradle
 build/
 !gradle/wrapper/gradle-wrapper.jar
@@ -60,3 +61,6 @@ k.ps1
 
 ### certs
 src/main/resources/certs
+
+# Claude Code
+.claude/

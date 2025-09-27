@@ -22,3 +22,13 @@ spring:
         order_updates: true
         jdbc.batch_size: 20
         default_batch_fetch_size: ${chunkSize:100}
+
+logging:
+  level:
+    com.gemmap.gemmap: INFO
+    org.springframework.security: WARN
+
+# Dev 환경 설정
+cors:
+  allowed-origins: ${CORS_ALLOWED_ORIGINS}
+  max-age: 3600
