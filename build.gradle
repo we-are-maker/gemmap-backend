@@ -24,6 +24,12 @@ repositories {
 	mavenCentral()
 }
 
+dependencyManagement {
+	imports {
+		mavenBom "software.amazon.awssdk:bom:2.20.28"
+	}
+}
+
 dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
 	implementation 'org.springframework.boot:spring-boot-starter-oauth2-resource-server'
@@ -46,6 +52,9 @@ dependencies {
 
 	// Jackson for JSON processing
 	implementation 'com.fasterxml.jackson.core:jackson-databind'
+
+	// AWS S3 SDK for NHN Object Storage
+	implementation("software.amazon.awssdk:s3")
 }
 
 tasks.named('test') {
