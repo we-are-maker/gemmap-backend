@@ -126,7 +126,22 @@ class ImageServiceTest {
         // given
         String fileUrl = "http://mock.url/test-bucket/spots/2024/10/uuid.jpg";
         String key = "spots/2024/10/uuid.jpg";
-        Image image = Image.builder().fileUrl(fileUrl).build();
+        Image image = Image.builder()
+                .fileUrl(fileUrl)
+                .width(100)
+                .height(100)
+                .mimeType("image/jpeg")
+                .sizeBytes(100L)
+                .takenAt(null)
+                .latitude(null)
+                .longitude(null)
+                .cameraMake(null)
+                .cameraModel(null)
+                .focalLength(null)
+                .aperture(null)
+                .iso(null)
+                .shutterSpeed(null)
+                .build();
         try {
             java.lang.reflect.Field idField = Image.class.getDeclaredField("id");
             idField.setAccessible(true);

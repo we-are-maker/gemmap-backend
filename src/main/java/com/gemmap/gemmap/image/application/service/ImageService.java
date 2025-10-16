@@ -58,13 +58,17 @@ public class ImageService {
             int width = (bufferedImage != null) ? bufferedImage.getWidth() : 0;
             int height = (bufferedImage != null) ? bufferedImage.getHeight() : 0;
 
-            Image image = Image.builder()
+            Image.ImageBuilder imageBuilder = Image.builder()
                     .fileUrl(fileUrl)
                     .width(width)
                     .height(height)
                     .mimeType(file.getContentType())
-                    .sizeBytes(file.getSize())
-                    .build();
+                    .sizeBytes(file.getSize());
+
+            // EXIF 데이터 추출
+            ExifExtractor.extract(file, imageBuilder);
+
+            Image image = imageBuilder.build();
 
             return imageRepository.save(image);
 

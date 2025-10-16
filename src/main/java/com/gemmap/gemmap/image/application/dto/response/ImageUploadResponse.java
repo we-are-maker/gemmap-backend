@@ -5,6 +5,8 @@ import com.gemmap.gemmap.image.domain.entity.ImageStatus;
 import com.gemmap.gemmap.image.domain.entity.StorageProvider;
 import lombok.Getter;
 
+
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Getter
@@ -19,6 +21,15 @@ public class ImageUploadResponse {
     private final StorageProvider storageProvider;
     private final ImageStatus status;
     private final LocalDateTime createdAt;
+    private final LocalDateTime takenAt;
+    private final BigDecimal latitude;
+    private final BigDecimal longitude;
+    private final String cameraMake;
+    private final String cameraModel;
+    private final BigDecimal focalLength;
+    private final BigDecimal aperture;
+    private final Integer iso;
+    private final String shutterSpeed;
 
     public ImageUploadResponse(Image image) {
         this.id = image.getId();
@@ -30,5 +41,14 @@ public class ImageUploadResponse {
         this.storageProvider = image.getStorageProvider();
         this.status = image.getStatus();
         this.createdAt = image.getCreatedAt();
+        this.takenAt = image.getTakenAt();
+        this.latitude = image.getLatitude();
+        this.longitude = image.getLongitude();
+        this.cameraMake = image.getCameraMake();
+        this.cameraModel = image.getCameraModel();
+        this.focalLength = image.getFocalLength();
+        this.aperture = image.getAperture();
+        this.iso = image.getIso();
+        this.shutterSpeed = image.getShutterSpeed();
     }
 }
