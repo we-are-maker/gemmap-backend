@@ -1,0 +1,32 @@
+plugins {
+	id 'java-library'
+	id 'io.spring.dependency-management'
+}
+
+description = 'Common security library for JWT authentication and authorization'
+
+dependencyManagement {
+	imports {
+		mavenBom "org.springframework.boot:spring-boot-dependencies:3.5.4"
+	}
+}
+
+dependencies {
+	// Dependency on common-core
+	api project(':libs:common-core')
+
+	// Lombok
+	compileOnly libs.lombok
+	annotationProcessor libs.lombok
+
+	// JWT dependencies
+	api libs.jwt.api
+	runtimeOnly libs.jwt.impl
+	runtimeOnly libs.jwt.jackson
+
+	// Spring Security (compile only - provided by services)
+	compileOnly libs.spring.boot.starter.security
+
+	// Jakarta Servlet API (for filters)
+	compileOnly 'jakarta.servlet:jakarta.servlet-api:6.0.0'
+}

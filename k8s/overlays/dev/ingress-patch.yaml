@@ -1,19 +1,41 @@
+# [가정/추측함] dev 환경 호스트 및 TLS 설정 패치
+# (직접 작업) 실제 dev 도메인과 TLS 시크릿으로 교체 필요
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: gemmap-api
+  name: gemmap-ingress
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
 spec:
   tls:
-    - hosts: [ "api-dev.gemmap.site" ]
-      secretName: gemmap-tls
+    - hosts:
+        - api-dev.gemmap.site
+      secretName: gemmap-tls-dev
   rules:
-    - host: "api-dev.gemmap.site"
+    - host: api-dev.gemmap.site
       http:
         paths:
-          - path: /
+          # User Service - 인증/사용자 관리
+          - path: /api/auth
             pathType: Prefix
             backend:
               service:
-                name: gemmap-service
+                name: user-service
                 port:
-                  number: 8080
+                  number: 8081
+          # Spot Service - 이미지/스팟 관리
+          - path: /api/v1/images
+            pathType: Prefix
+            backend:
+              service:
+                name: spot-service
+                port:
+                  number: 8082
+          # Actuator 헬스체크 (user-service로 라우팅)
+          - path: /actuator
+            pathType: Prefix
+            backend:
+              service:
+                name: user-service
+                port:
+                  number: 8081

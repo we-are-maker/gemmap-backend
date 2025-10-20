@@ -2,22 +2,13 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 namespace: dev
 resources:
-  - ../../base
-  - configmap.yaml
+  - ../../base/ingress
+  - user-service
+  - spot-service
+  # Secret은 kustomize 외부에서 별도로 관리 (kubectl apply -f k8s/secrets/dev-secrets.yaml)
+  # Kustomize는 보안상 디렉토리 외부 파일 참조를 허용하지 않음
 patches:
-  - path: deployment-replicas-patch.yaml
-    target:
-      kind: Deployment
-      name: gemmap-api
-  - path: deployment-imagepullsecret-patch.yaml
-    target:
-      kind: Deployment
-      name: gemmap-api
-  - path: deployment-secret-patch.yaml
-    target:
-      kind: Deployment
-      name: gemmap-api
   - path: ingress-patch.yaml
     target:
       kind: Ingress
-      name: gemmap-api
+      name: gemmap-ingress
