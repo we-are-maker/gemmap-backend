@@ -1,0 +1,47 @@
+# ============================================================================
+# spot-service NetworkPolicy - VM DB Egress 허용
+# ============================================================================
+# VM_HOST_IP는 배포 시 envsubst로 동적 치환됨 (GitHub Secrets 사용)
+# 예: export VM_HOST_IP=10.0.1.100 && kubectl kustomize ... | envsubst | kubectl apply -f -
+# ============================================================================
+
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: spot-service-egress
+  namespace: dev
+spec:
+  podSelector:
+    matchLabels:
+      app: spot-service
+  policyTypes:
+    - Egress
+  egress:
+    # VM DB (spot-db) 접근 허용 - 포트 33062
+    - to:
+        - ipBlock:
+            cidr: ${VM_HOST_IP}/32
+      ports:
+        - protocol: TCP
+          port: 33062
+    # DNS 조회 허용
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+    # 기타 필요한 외부 API 접근 (NHN Object Storage 등)
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8
+              - 172.16.0.0/12
+              - 192.168.0.0/16
+      ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 80

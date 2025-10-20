@@ -1,19 +1,18 @@
-# [가정/추측함] dev 환경 호스트 및 TLS 설정 패치
-# (직접 작업) 실제 dev 도메인과 TLS 시크릿으로 교체 필요
+# [가정/추측함] Ingress 경로는 /api/auth/** -> user-service, /api/v1/images/** -> spot-service
+# 호스트명과 TLS는 dev 오버레이에서 패치됨
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: gemmap-ingress
+  labels:
+    app: gemmap
   annotations:
-    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
 spec:
-  tls:
-    - hosts:
-        - api-dev.gemmap.site
-      secretName: gemmap-tls-dev
+  ingressClassName: nginx
   rules:
-    - host: api-dev.gemmap.site
-      http:
+    - http:
         paths:
           # User Service - 인증/사용자 관리
           - path: /api/auth

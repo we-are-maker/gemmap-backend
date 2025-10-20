@@ -1,7 +1,0 @@
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: gemmap-config
-data:
-  SPRING_PROFILES_ACTIVE: "dev"
-  LOG_LEVEL_ROOT: "INFO"
