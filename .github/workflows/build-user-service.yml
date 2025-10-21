@@ -119,3 +119,12 @@ jobs:
             -H "X-TC-AUTHENTICATION-SECRET:${NHN_AUTH_SECRET}" \
             -H "X-NHN-APPKEY:${NHN_APPKEY}" \
             "https://kr1-pipeline.api.nhncloudservice.com/api/anchor/v1.0/pipelines/${NHN_PIPELINE}/execute"
+
+      - name: Bump user-service chart version
+        if: success()
+        run: |
+          sed -i "s/^version: .*/version: 0.1.${GITHUB_RUN_NUMBER}/" charts/user-service/Chart.yaml
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git commit -am "chore(user-chart): bump 0.1.${GITHUB_RUN_NUMBER}" || true
+          git push
