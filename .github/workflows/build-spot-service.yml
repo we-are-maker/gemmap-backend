@@ -109,7 +109,7 @@ jobs:
           NHN_APPKEY: ${{ secrets.NHN_APPKEY }}
           NHN_AUTH_ID: ${{ secrets.NHN_USER_ACCESS_KEY_ID }}
           NHN_AUTH_SECRET: ${{ secrets.NHN_USER_ACCESS_KEY_SECRET }}
-          NHN_PIPELINE: gemmap-spot-service-dev-pipeline
+          NHN_PIPELINE: contest11-dev-pipeline-2
         run: |
           set -eux
           curl --fail --show-error --location --max-time 20 -i -X POST \
