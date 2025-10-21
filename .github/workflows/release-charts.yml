@@ -1,0 +1,33 @@
+# .github/workflows/release-charts.yml
+name: Release Helm Charts
+on:
+  push:
+    branches: [develop]
+    paths: ['charts/**']
+  workflow_dispatch: {} # (옵션) 수동 실행 허용
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: azure/setup-helm@v4
+      # (옵션) 간단 버전 증가
+      - name: Bump chart versions
+        run: |
+          for c in charts/*/Chart.yaml; do
+            sed -i "s/^version: .*/version: 0.1.${GITHUB_RUN_NUMBER}/" "$c"
+          done
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git commit -am "chore(charts): bump to 0.1.${GITHUB_RUN_NUMBER}" || true
+      - name: Release charts (.tgz + update gh-pages/index.yaml)
+        uses: helm/chart-releaser-action@v1.7.0
+        with:
+          charts_dir: charts
+        env:
+          CR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
