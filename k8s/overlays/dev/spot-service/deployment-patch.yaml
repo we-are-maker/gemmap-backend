@@ -1,0 +1,17 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: spot-service
+spec:
+  replicas: 2  # dev 환경은 2개 레플리카
+  template:
+    spec:
+      # [가정/추측함] imagePullSecret 필요 시 주석 해제
+      # (직접 작업) Docker registry secret 필요 시 활성화
+      # imagePullSecrets:
+      #   - name: gemmap-registry-secret
+      containers:
+        - name: app
+          envFrom:
+            - secretRef:
+                name: spot-service-secret

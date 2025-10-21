@@ -1,0 +1,40 @@
+# [가정/추측함] Ingress 경로는 /api/auth/** -> user-service, /api/v1/images/** -> spot-service
+# 호스트명과 TLS는 dev 오버레이에서 패치됨
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: gemmap-ingress
+  labels:
+    app: gemmap
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+spec:
+  ingressClassName: nginx
+  rules:
+    - http:
+        paths:
+          # User Service - 인증/사용자 관리
+          - path: /api/auth
+            pathType: Prefix
+            backend:
+              service:
+                name: user-service
+                port:
+                  number: 8081
+          # Spot Service - 이미지/스팟 관리
+          - path: /api/v1/images
+            pathType: Prefix
+            backend:
+              service:
+                name: spot-service
+                port:
+                  number: 8082
+          # Actuator 헬스체크 (user-service로 라우팅)
+          - path: /actuator
+            pathType: Prefix
+            backend:
+              service:
+                name: user-service
+                port:
+                  number: 8081

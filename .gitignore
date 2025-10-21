@@ -1,0 +1,71 @@
+HELP.md
+SECRETS.md
+.gradle
+build/
+!gradle/wrapper/gradle-wrapper.jar
+!**/src/main/**/build/
+!**/src/test/**/build/
+
+### STS ###
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+bin/
+!**/src/main/**/bin/
+!**/src/test/**/bin/
+
+### IntelliJ IDEA ###
+.idea
+*.iws
+*.iml
+*.ipr
+out/
+!**/src/main/**/out/
+!**/src/test/**/out/
+
+### NetBeans ###
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+
+### VS Code ###
+.vscode/
+
+# Environment Variable
+.env
+
+# OS specific files
+desktop.ini
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Kubernetes & SSL
+.kube/
+*.pem
+*_kubeconfig.yaml
+k8s/secrets/dev-secrets.yaml
+letsencrypt-*.yaml
+dev-echo.yaml
+k.ps1
+
+### certs
+src/main/resources/certs
+
+# Claude Code
+.claude/
+
+nul
+
+# docs
+/z_docs
