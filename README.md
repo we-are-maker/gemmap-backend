@@ -1,4 +1,4 @@
-# gemmap-backend
+# Gemmap Backend
 
 Gemmap 프로젝트의 백엔드 서비스입니다. Gradle 멀티모듈 구조로 마이크로서비스 아키텍처를 구현하고 있습니다.
 
