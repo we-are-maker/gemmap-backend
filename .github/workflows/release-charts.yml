@@ -48,6 +48,12 @@ jobs:
 
       - uses: azure/setup-helm@v4
 
+      # Git author 설정 (gh-pages에 index.yaml 커밋용)
+      - name: Configure git author for gh-pages commit
+        run: |
+          git config --global user.name  "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
       # 대상 서비스 감지: workflow_run이면 이름으로, 그 외면 inputs 또는 both
       - name: Resolve target services
         id: svc
