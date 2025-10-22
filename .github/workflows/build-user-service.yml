@@ -102,6 +102,33 @@ jobs:
           docker push $REGISTRY/$IMAGE_NAME:dev-$SHA7
           docker push $REGISTRY/$IMAGE_NAME:dev-latest
 
+      - name: Setup kubectl
+        if: github.ref == 'refs/heads/develop'
+        uses: azure/setup-kubectl@v4
+        with:
+          version: 'latest'
+
+      - name: Configure kubeconfig for NHN Kubernetes
+        if: github.ref == 'refs/heads/develop'
+        run: |
+          mkdir -p $HOME/.kube
+          echo "${{ secrets.KUBECONFIG_DEV }}" | base64 -d > $HOME/.kube/config
+          chmod 600 $HOME/.kube/config
+
+      - name: Install envsubst
+        if: github.ref == 'refs/heads/develop'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gettext-base
+
+      - name: Apply user-service NetworkPolicy with envsubst
+        if: github.ref == 'refs/heads/develop'
+        env:
+          VM_HOST_IP: ${{ secrets.VM_HOST_IP }}
+        run: |
+          set -eux
+          envsubst < k8s/overlays/dev/user-service/networkpolicy.yaml | kubectl apply -f -
+
       - name: Execute NHN Pipeline - user-service (dev)
         if: github.ref == 'refs/heads/develop'
         env:
