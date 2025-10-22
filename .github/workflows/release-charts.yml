@@ -1,4 +1,3 @@
-# .github/workflows/release-charts.yml
 name: Release Helm Charts
 
 on:
