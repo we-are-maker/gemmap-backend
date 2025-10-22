@@ -6,8 +6,12 @@ on:
       - Build & Deploy User Service
       - Build & Deploy Spot Service
     types: [completed]
-    branches:
-      - develop
+    branches: [develop]    # 빌드 워크플로가 주로 develop에서 돌면 유지
+    push:
+      branches: [develop]    # Default branch로
+      paths:
+        - '.github/workflows/release-charts.yml'  # 워크플로 수정 시 바로 테스트
+        - 'charts/**'                             # charts 변경만으로도 릴리스
   workflow_dispatch: {}   # (옵션) 수동 실행 허용
 
 permissions:
