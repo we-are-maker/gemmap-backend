@@ -82,11 +82,11 @@ jobs:
       - name: Set chart version (no commit)
         shell: bash
         run: |
-          V="0.1.${GITHUB_RUN_NUMBER}"
+          V="0.1.${GITHUB_RUN_NUMBER}-${GITHUB_RUN_ATTEMPT}"  # 예: 0.1.4-2
           IFS=, read -ra arr <<< "${{ steps.svc.outputs.targets }}"
           for s in "${arr[@]}"; do
-            sed -i "s/^version: .*/version: ${V}/" "charts/$s/Chart.yaml"
-            echo "Bumped charts/$s/Chart.yaml to ${V}"
+          sed -i "s/^version: .*/version: ${V}/" "charts/$s/Chart.yaml"
+          echo "Bumped charts/$s/Chart.yaml to ${V}"
           done
           echo "VERSION=${V}" >> $GITHUB_ENV
 
@@ -95,6 +95,7 @@ jobs:
         uses: helm/chart-releaser-action@v1.7.0
         with:
           charts_dir: charts
+          skip_existing: true # 동일 태그 있으면 업로드 스킵(실패하지 않음)
         env:
           CR_TOKEN: ${{ secrets.CHARTS_PAT }}
 
