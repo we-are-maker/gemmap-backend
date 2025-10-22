@@ -1,33 +1,87 @@
 # .github/workflows/release-charts.yml
 name: Release Helm Charts
+
 on:
-  push:
-    branches: [develop]
-    paths: ['charts/**']
-  workflow_dispatch: {} # (옵션) 수동 실행 허용
+  workflow_run:
+    workflows:
+      - Build & Deploy User Service
+      - Build & Deploy Spot Service
+    types: [completed]
+  workflow_dispatch: {}   # (옵션) 수동 실행 허용
 
 permissions:
-  contents: write
+  contents: read          # 쓰기는 PAT로 수행
+
+concurrency:
+  group: release-charts
+  cancel-in-progress: false
 
 jobs:
   release:
+    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
+    env:
+      CHART_BASE_URL: https://we-are-maker.github.io/gemmap-backend/
     steps:
       - uses: actions/checkout@v4
-        with: { fetch-depth: 0 }
+        with:
+          fetch-depth: 0
+
       - uses: azure/setup-helm@v4
-      # (옵션) 간단 버전 증가
-      - name: Bump chart versions
+
+      # 어떤 워크플로가 끝났는지에 따라 대상 서비스 결정 (user/spot)
+      - name: Detect built service
+        id: svc
         run: |
-          for c in charts/*/Chart.yaml; do
-            sed -i "s/^version: .*/version: 0.1.${GITHUB_RUN_NUMBER}/" "$c"
-          done
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git commit -am "chore(charts): bump to 0.1.${GITHUB_RUN_NUMBER}" || true
+          N="${{ github.event.workflow_run.name }}"
+          if echo "$N" | grep -qi "User Service"; then
+            echo "name=user-service"   >> $GITHUB_OUTPUT
+            echo "chart_dir=charts/user-service" >> $GITHUB_OUTPUT
+            echo "pipeline_id=contest11-dev-pipeline-1" >> $GITHUB_OUTPUT
+          elif echo "$N" | grep -qi "Spot Service"; then
+            echo "name=spot-service"   >> $GITHUB_OUTPUT
+            echo "chart_dir=charts/spot-service" >> $GITHUB_OUTPUT
+            echo "pipeline_id=contest11-dev-pipeline-2" >> $GITHUB_OUTPUT
+          else
+            echo "Unknown workflow: $N"; exit 1
+          fi
+
+      # 커밋 없이 '로컬 파일'의 버전만 변경 (둘 중 해당 서비스만 변경)
+      - name: Set chart version (no commit)
+        run: |
+          V="0.1.${GITHUB_RUN_NUMBER}"
+          sed -i "s/^version: .*/version: ${V}/" "${{ steps.svc.outputs.chart_dir }}/Chart.yaml"
+          echo "VERSION=${V}" >> $GITHUB_ENV
+
+      # PAT로 릴리스 + gh-pages/index.yaml 갱신
       - name: Release charts (.tgz + update gh-pages/index.yaml)
         uses: helm/chart-releaser-action@v1.7.0
         with:
           charts_dir: charts
         env:
-          CR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CR_TOKEN: ${{ secrets.CHARTS_PAT }}
+
+      # index.yaml에 이번 버전이 반영될 때까지 짧게 폴링 (레이스 방지)
+      - name: Wait index.yaml updated
+        run: |
+          set -eux
+          for i in {1..30}; do
+            curl -fsSL "$CHART_BASE_URL/index.yaml" | grep "${VERSION}" && break || sleep 2
+          done
+
+      # NHN Pipeline Anchor: 차트 발행 이후에 트리거하여 순서 보장
+      - name: Execute NHN Pipeline (dev)
+        env:
+          NHN_REGION: KR1
+          NHN_APPKEY: ${{ secrets.NHN_APPKEY }}
+          NHN_AUTH_ID: ${{ secrets.NHN_USER_ACCESS_KEY_ID }}
+          NHN_AUTH_SECRET: ${{ secrets.NHN_USER_ACCESS_KEY_SECRET }}
+        run: |
+          set -eux
+          curl --fail --show-error --location --max-time 30 -i -X POST \
+            -H "Content-Type:application/json" \
+            -H "X-NHN-REGION:${NHN_REGION}" \
+            -H "X-TC-AUTHENTICATION-ID:${NHN_AUTH_ID}" \
+            -H "X-TC-AUTHENTICATION-SECRET:${NHN_AUTH_SECRET}" \
+            -H "X-NHN-APPKEY:${NHN_APPKEY}" \
+            "https://kr1-pipeline.api.nhncloudservice.com/api/anchor/v1.0/pipelines/${{ steps.svc.outputs.pipeline_id }}/execute"
