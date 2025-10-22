@@ -1,6 +1,0 @@
-apiVersion: v2
-name: spot-service
-description: Spot service for photo-spot app
-type: application
-version: 0.1.0          # <- CI에서 자동 갱신
-appVersion: "1.0.0"

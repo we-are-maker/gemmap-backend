@@ -101,3 +101,21 @@ jobs:
           set -eux
           docker push $REGISTRY/$IMAGE_NAME:dev-$SHA7
           docker push $REGISTRY/$IMAGE_NAME:dev-latest
+
+      - name: Execute NHN Pipeline - user-service (dev)
+        if: github.ref == 'refs/heads/develop'
+        env:
+          NHN_REGION: KR1
+          NHN_APPKEY: ${{ secrets.NHN_APPKEY }}
+          NHN_AUTH_ID: ${{ secrets.NHN_USER_ACCESS_KEY_ID }}
+          NHN_AUTH_SECRET: ${{ secrets.NHN_USER_ACCESS_KEY_SECRET }}
+          NHN_PIPELINE: contest11-dev-pipeline-1
+        run: |
+          set -eux
+          curl --fail --show-error --location --max-time 20 -i -X POST \
+            -H "Content-Type:application/json" \
+            -H "X-NHN-REGION:${NHN_REGION}" \
+            -H "X-TC-AUTHENTICATION-ID:${NHN_AUTH_ID}" \
+            -H "X-TC-AUTHENTICATION-SECRET:${NHN_AUTH_SECRET}" \
+            -H "X-NHN-APPKEY:${NHN_APPKEY}" \
+            "https://kr1-pipeline.api.nhncloudservice.com/api/anchor/v1.0/pipelines/${NHN_PIPELINE}/execute"

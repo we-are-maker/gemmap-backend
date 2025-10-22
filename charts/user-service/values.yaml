@@ -1,8 +1,0 @@
-image:
-  repository: docker.io/gemmap/user-service
-  tag: dev-latest # 기본 태그(오버라이드로 바꿀 수 있음)
-replicaCount: 1
-service:
-  type: ClusterIP
-  port: 8081
-resources: {}
