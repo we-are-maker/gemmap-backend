@@ -1,0 +1,84 @@
+apiVersion: v1
+data:
+  LOG_LEVEL_ROOT: "INFO"
+  SPRING_PROFILES_ACTIVE: "dev"
+kind: ConfigMap
+metadata:
+  name: gemmap-config
+  namespace: dev
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: gemmap-api
+  name: gemmap-service
+  namespace: dev
+spec:
+  ports:
+  - port: 8080
+    targetPort: 8080
+  selector:
+    app: gemmap-api
+  type: ClusterIP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: gemmap-api
+  name: gemmap-api
+  namespace: dev
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: gemmap-api
+  template:
+    metadata:
+      labels:
+        app: gemmap-api
+    spec:
+      containers:
+      - envFrom:
+        - secretRef:
+            name: gemmap-db-secret
+        image: docker.io/gemmap/gemmap:dev-latest
+        imagePullPolicy: Always
+        name: app
+        ports:
+        - containerPort: 8080
+        resources:
+          limits:
+            cpu: 800m
+            memory: 1Gi
+          requests:
+            cpu: 300m
+            memory: 512Mi
+      imagePullSecrets:
+      - name: regcred
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+  name: gemmap-api
+  namespace: dev
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: api-dev.gemmap.site
+    http:
+      paths:
+      - backend:
+          service:
+            name: gemmap-service
+            port:
+              number: 8080
+        path: /
+        pathType: Prefix
+  tls:
+  - hosts:
+    - api-dev.gemmap.site
+    secretName: gemmap-tls

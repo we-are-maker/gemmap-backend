@@ -1,0 +1,38 @@
+spring:
+  config:
+    import: optional:file:.env[.properties]
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://${DB_HOST}:${DB_PORT}/${DB_NAME}?useSSL=false&serverTimezone=Asia/Seoul&useLegacyDatetimeCode=false&allowPublicKeyRetrieval=true
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+    hikari:
+      pool-name: jpa-hikari-pool
+      maximum-pool-size: 5
+      data-source-properties:
+        rewriteBatchedStatements: true
+  jpa:
+    open-in-view: false
+    generate-ddl: true
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+        order_inserts: true
+        order_updates: true
+        jdbc.batch_size: 20
+        default_batch_fetch_size: ${chunkSize:100}
+
+logging:
+  level:
+    com.gemmap.gemmap: DEBUG
+    org.springframework.security: DEBUG
+    org.hibernate.SQL: DEBUG
+    org.springframework.security.oauth2: DEBUG
+
+# Local 환경 JWT 설정 (개발용 - 짧은 만료 시간)
+jwt:
+  access-token-expiration: ${JWT_ACCESS_TOKEN_EXPIRATION:3600000}     # 1시간
+  refresh-token-expiration: ${JWT_REFRESH_TOKEN_EXPIRATION:86400000}  # 1일

@@ -64,8 +64,3 @@ src/main/resources/certs
 
 # Claude Code
 .claude/
-
-nul
-
-# docs
-/z_docs

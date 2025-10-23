@@ -1,9 +1,1 @@
 rootProject.name = 'gemmap'
-
-// Include multi-module structure
-include(
-    'libs:common-core',
-    'libs:common-security-jwt',
-    'services:user-service',
-    'services:spot-service'
-)

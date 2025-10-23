@@ -1,0 +1,28 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gemmap-api
+  labels: { app: gemmap-api }
+  annotations:
+    traffic.spinnaker.io/load-balancers: '["service gemmap-service"]'
+spec:
+  replicas: 1  # dev 오버레이에서 패치로 덮어씀
+  selector:
+    matchLabels: { app: gemmap-api }
+  template:
+    metadata:
+      labels: { app: gemmap-api }
+    spec:
+      containers:
+        - name: app
+          # 이미지 규칙(실 리포확인): gemmap/gemmap:<IMAGE_TAG>
+          image: docker.io/gemmap/gemmap:dev-latest
+          ports:
+            - containerPort: 8080
+          resources:
+            requests:
+              cpu: "300m"
+              memory: "512Mi"
+            limits:
+              cpu: "800m"
+              memory: "1Gi"
