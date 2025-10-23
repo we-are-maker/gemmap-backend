@@ -21,3 +21,7 @@ patches:
     target:
       kind: Ingress
       name: gemmap-api
+  - path: service-selector-patch.yaml
+    target:
+      kind: Service
+      name: gemmap-service
