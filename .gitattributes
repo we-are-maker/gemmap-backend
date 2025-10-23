@@ -9,3 +9,5 @@
 *.gradle text eol=lf
 *.md     text eol=lf
 *.sh     text eol=lf
+
+k8s/releases/dev.yaml text
