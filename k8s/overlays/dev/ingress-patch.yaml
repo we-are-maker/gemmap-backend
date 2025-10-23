@@ -2,6 +2,10 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: gemmap-api
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"   # 요청 전체 허용 크기
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
 spec:
   tls:
     - hosts: [ "api-dev.gemmap.site" ]
