@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: gemmap-service
+spec:
+  selector:
+    $patch: replace  # 기존 selector 완전 대체
+    frontedBy: gemmap-service  # Spinnaker 트래픽 관리용 전용 키
