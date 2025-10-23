@@ -51,6 +51,13 @@ public enum ErrorCode {
     EXTERNAL_SERVICE_ERROR(50003, HttpStatus.INTERNAL_SERVER_ERROR, "외부 서비스 연동 중 오류가 발생했습니다."),
     JWT_SECRET_KEY_ERROR(50004, HttpStatus.INTERNAL_SERVER_ERROR, "JWT 시크릿 키 설정 오류입니다."),
 
+    // 파일 및 스토리지 관련 에러
+    IMAGE_UPLOAD_FAILED(50010, HttpStatus.INTERNAL_SERVER_ERROR, "이미지 업로드에 실패했습니다."),
+    S3_OPERATION_FAILED(50011, HttpStatus.INTERNAL_SERVER_ERROR, "Object Storage 작업 중 오류가 발생했습니다."),
+    IMAGE_DELETE_FAILED(50012, HttpStatus.INTERNAL_SERVER_ERROR, "이미지 삭제에 실패했습니다."),
+    INVALID_FILE_FORMAT(40010, HttpStatus.BAD_REQUEST, "지원하지 않는 파일 형식입니다."),
+    FILE_SIZE_EXCEEDED(40011, HttpStatus.BAD_REQUEST, "파일 크기가 너무 큽니다."),
+
     // OAuth2 관련 에러 (502 Bad Gateway - 외부 서비스 오류)
     KAKAO_TOKEN_REQUEST_FAILED(50201, HttpStatus.BAD_GATEWAY, "카카오 토큰 요청에 실패했습니다."),
     KAKAO_USER_INFO_REQUEST_FAILED(50202, HttpStatus.BAD_GATEWAY, "카카오 사용자 정보 조회에 실패했습니다."),

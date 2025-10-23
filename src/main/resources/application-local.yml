@@ -15,7 +15,7 @@ spring:
     open-in-view: false
     generate-ddl: true
     hibernate:
-      ddl-auto: create-drop
+      ddl-auto: update
     show-sql: true
     properties:
       hibernate:
@@ -36,3 +36,7 @@ logging:
 jwt:
   access-token-expiration: ${JWT_ACCESS_TOKEN_EXPIRATION:3600000}     # 1시간
   refresh-token-expiration: ${JWT_REFRESH_TOKEN_EXPIRATION:86400000}  # 1일
+
+# NHN Cloud Object Storage 설정
+s3:
+  base-path: local/spots/

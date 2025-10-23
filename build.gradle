@@ -24,6 +24,12 @@ repositories {
 	mavenCentral()
 }
 
+dependencyManagement {
+	imports {
+		mavenBom "software.amazon.awssdk:bom:2.20.28"
+	}
+}
+
 dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
 	implementation 'org.springframework.boot:spring-boot-starter-oauth2-resource-server'
@@ -46,6 +52,15 @@ dependencies {
 
 	// Jackson for JSON processing
 	implementation 'com.fasterxml.jackson.core:jackson-databind'
+
+	// AWS S3 SDK for NHN Object Storage
+	implementation("software.amazon.awssdk:s3")
+
+	// metadata-extractor for EXIF
+	implementation 'com.drewnoakes:metadata-extractor:2.19.0'
+
+	// hibernate-spatial for Point type
+	implementation 'org.hibernate.orm:hibernate-spatial:6.4.4.Final'
 }
 
 tasks.named('test') {
