@@ -1,0 +1,52 @@
+[versions]
+spring-boot = "3.5.4"
+spring-dependency-management = "1.1.7"
+java = "17"
+aws-sdk = "2.20.28"
+jwt = "0.12.6"
+metadata-extractor = "2.19.0"
+hibernate-spatial = "6.4.4.Final"
+
+[libraries]
+# Spring Boot Starters
+spring-boot-starter-web = { module = "org.springframework.boot:spring-boot-starter-web" }
+spring-boot-starter-data-jpa = { module = "org.springframework.boot:spring-boot-starter-data-jpa" }
+spring-boot-starter-security = { module = "org.springframework.boot:spring-boot-starter-security" }
+spring-boot-starter-validation = { module = "org.springframework.boot:spring-boot-starter-validation" }
+spring-boot-starter-webflux = { module = "org.springframework.boot:spring-boot-starter-webflux" }
+spring-boot-starter-oauth2-resource-server = { module = "org.springframework.boot:spring-boot-starter-oauth2-resource-server" }
+spring-boot-starter-test = { module = "org.springframework.boot:spring-boot-starter-test" }
+
+# Database
+mysql-connector = { module = "com.mysql:mysql-connector-j" }
+h2 = { module = "com.h2database:h2" }
+
+# Lombok
+lombok = { module = "org.projectlombok:lombok" }
+
+# JWT
+jwt-api = { module = "io.jsonwebtoken:jjwt-api", version.ref = "jwt" }
+jwt-impl = { module = "io.jsonwebtoken:jjwt-impl", version.ref = "jwt" }
+jwt-jackson = { module = "io.jsonwebtoken:jjwt-jackson", version.ref = "jwt" }
+
+# Jackson
+jackson-databind = { module = "com.fasterxml.jackson.core:jackson-databind" }
+
+# AWS SDK for NHN Object Storage
+aws-s3 = { module = "software.amazon.awssdk:s3" }
+
+# Metadata Extractor for EXIF
+metadata-extractor = { module = "com.drewnoakes:metadata-extractor", version.ref = "metadata-extractor" }
+
+# Hibernate Spatial for Point type
+hibernate-spatial = { module = "org.hibernate.orm:hibernate-spatial", version.ref = "hibernate-spatial" }
+
+# Security Test
+spring-security-test = { module = "org.springframework.security:spring-security-test" }
+
+# JUnit Platform
+junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher" }
+
+[plugins]
+spring-boot = { id = "org.springframework.boot", version.ref = "spring-boot" }
+spring-dependency-management = { id = "io.spring.dependency-management", version.ref = "spring-dependency-management" }

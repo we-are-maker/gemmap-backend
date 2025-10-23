@@ -1,0 +1,148 @@
+name: Build & Deploy User Service
+
+on:
+  push:
+    branches:
+      - develop
+    paths:
+      - 'services/user-service/**'
+      - 'libs/**'
+      - '.github/workflows/build-user-service.yml'
+  pull_request:
+    branches:
+      - develop
+    paths:
+      - 'services/user-service/**'
+      - 'libs/**'
+  workflow_dispatch:
+
+jobs:
+  build-test:
+    name: Build & Test user-service
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew
+
+      - name: Build user-service (includes test)
+        run: |
+          ./gradlew :services:user-service:clean :services:user-service:build --no-daemon
+
+  build-push-image:
+    name: Build & Push user-service Docker Image
+    runs-on: ubuntu-latest
+    needs: build-test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
+    env:
+      REGISTRY: docker.io
+      IMAGE_NAME: gemmap/user-service
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew
+
+      - name: Short SHA
+        id: meta
+        shell: bash
+        run: echo "sha7=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+
+      - name: Docker Login
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Build Docker Image using Gradle bootBuildImage
+        env:
+          SHA7: ${{ steps.meta.outputs.sha7 }}
+        run: |
+          set -eux
+          ./gradlew :services:user-service:bootBuildImage \
+            --imageName=$REGISTRY/$IMAGE_NAME:dev-$SHA7 \
+            --no-daemon
+
+      - name: Tag as dev-latest
+        env:
+          SHA7: ${{ steps.meta.outputs.sha7 }}
+        run: |
+          docker tag $REGISTRY/$IMAGE_NAME:dev-$SHA7 $REGISTRY/$IMAGE_NAME:dev-latest
+
+      - name: Push Docker Images
+        env:
+          SHA7: ${{ steps.meta.outputs.sha7 }}
+        run: |
+          set -eux
+          docker push $REGISTRY/$IMAGE_NAME:dev-$SHA7
+          docker push $REGISTRY/$IMAGE_NAME:dev-latest
+
+      - name: Setup kubectl
+        if: github.ref == 'refs/heads/develop'
+        uses: azure/setup-kubectl@v4
+        with:
+          version: 'latest'
+
+      - name: Configure kubeconfig for NHN Kubernetes
+        if: github.ref == 'refs/heads/develop'
+        run: |
+          mkdir -p $HOME/.kube
+          echo "${{ secrets.KUBECONFIG_DEV }}" | base64 -d > $HOME/.kube/config
+          chmod 600 $HOME/.kube/config
+
+      - name: Install envsubst
+        if: github.ref == 'refs/heads/develop'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gettext-base
+
+      - name: Apply user-service NetworkPolicy with envsubst
+        if: github.ref == 'refs/heads/develop'
+        env:
+          VM_HOST_IP: ${{ secrets.VM_HOST_IP }}
+        run: |
+          set -eux
+          envsubst < k8s/overlays/dev/user-service/networkpolicy.yaml | kubectl apply -f -
+
+      - name: Execute NHN Pipeline - user-service (dev)
+        if: github.ref == 'refs/heads/develop'
+        env:
+          NHN_REGION: KR1
+          NHN_APPKEY: ${{ secrets.NHN_APPKEY }}
+          NHN_AUTH_ID: ${{ secrets.NHN_USER_ACCESS_KEY_ID }}
+          NHN_AUTH_SECRET: ${{ secrets.NHN_USER_ACCESS_KEY_SECRET }}
+          NHN_PIPELINE: contest11-dev-pipeline-1
+        run: |
+          set -eux
+          curl --fail --show-error --location --max-time 20 -i -X POST \
+            -H "Content-Type:application/json" \
+            -H "X-NHN-REGION:${NHN_REGION}" \
+            -H "X-TC-AUTHENTICATION-ID:${NHN_AUTH_ID}" \
+            -H "X-TC-AUTHENTICATION-SECRET:${NHN_AUTH_SECRET}" \
+            -H "X-NHN-APPKEY:${NHN_APPKEY}" \
+            "https://kr1-pipeline.api.nhncloudservice.com/api/anchor/v1.0/pipelines/${NHN_PIPELINE}/execute"

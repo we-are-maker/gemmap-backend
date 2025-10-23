@@ -1,0 +1,71 @@
+﻿apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: spot-service
+    service: spot
+  name: spot-service
+  namespace: dev
+spec:
+  ports:
+  - name: http
+    port: 8082
+    protocol: TCP
+    targetPort: 8082
+  selector:
+    app: spot-service
+  type: ClusterIP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: spot-service
+    service: spot
+  name: spot-service
+  namespace: dev
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: spot-service
+  template:
+    metadata:
+      labels:
+        app: spot-service
+        service: spot
+    spec:
+      containers:
+      - envFrom:
+        - secretRef:
+            name: spot-service-secret
+        image: docker.io/gemmap/spot-service:dev-latest
+        imagePullPolicy: Always
+        livenessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /actuator/health/liveness
+            port: 8082
+          initialDelaySeconds: 60
+          periodSeconds: 10
+          timeoutSeconds: 5
+        name: app
+        ports:
+        - containerPort: 8082
+          name: http
+          protocol: TCP
+        readinessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /actuator/health/readiness
+            port: 8082
+          initialDelaySeconds: 30
+          periodSeconds: 5
+          timeoutSeconds: 3
+        resources:
+          limits:
+            cpu: 800m
+            memory: 1Gi
+          requests:
+            cpu: 300m
+            memory: 512Mi
