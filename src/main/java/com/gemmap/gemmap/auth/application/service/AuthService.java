@@ -1,25 +1,34 @@
 package com.gemmap.gemmap.auth.application.service;
 
+import com.gemmap.gemmap.auth.application.dto.kakao.KakaoAccessTokenInfoResponse;
 import com.gemmap.gemmap.auth.application.dto.kakao.KakaoTokenResponse;
 import com.gemmap.gemmap.auth.application.dto.kakao.KakaoUserInfoResponse;
 import com.gemmap.gemmap.auth.application.dto.response.KakaoLoginResponseDto;
 import com.gemmap.gemmap.auth.application.dto.response.KakaoTokenRefreshResponseDto;
+import com.gemmap.gemmap.auth.application.dto.response.RegisterResponseDto;
 import com.gemmap.gemmap.auth.domain.entity.User;
 import com.gemmap.gemmap.auth.domain.repository.UserRepository;
 import com.gemmap.gemmap.auth.infrastructure.jwt.JwtTokenDto;
 import com.gemmap.gemmap.auth.infrastructure.jwt.JwtUtil;
 import com.gemmap.gemmap.auth.infrastructure.oauth.KakaoOAuth2Service;
+import com.gemmap.gemmap.image.infrastructure.objectstorage.ObjectStorageService;
+import com.gemmap.gemmap.image.infrastructure.objectstorage.S3UrlGenerator;
 import com.gemmap.gemmap.shared.common.constants.Constant;
 import com.gemmap.gemmap.shared.common.enums.EProvider;
 import com.gemmap.gemmap.shared.common.enums.ERole;
+import com.gemmap.gemmap.shared.config.s3.S3Properties;
 import com.gemmap.gemmap.shared.exception.CommonException;
 import com.gemmap.gemmap.shared.exception.ErrorCode;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.Optional;
+import java.util.UUID;
 
 /**
  * 인증 관련 비즈니스 로직을 처리하는 서비스 클래스
@@ -38,60 +47,10 @@ public class AuthService {
     private final UserRepository userRepository;
     private final JwtUtil jwtUtil;
     private final KakaoOAuth2Service kakaoOAuth2Service;
+    private final ObjectStorageService objectStorageService;
+    private final S3UrlGenerator s3UrlGenerator;
+    private final S3Properties s3Properties;
 
-    /**
-     * 카카오 인가 URL 생성
-     */
-    public String getKakaoAuthorizationUrl() {
-        try {
-            return kakaoOAuth2Service.getAuthorizationUrl();
-        } catch (Exception e) {
-            log.error("카카오 인가 URL 생성 실패: {}", e.getMessage());
-            throw new CommonException(ErrorCode.EXTERNAL_SERVICE_ERROR);
-        }
-    }
-
-    /**
-    * 카카오 로그인 처리 (인가 코드로 로그인)
-    */
-    @Transactional
-    public KakaoLoginResponseDto kakaoLogin(String authorizationCode) {
-        if (authorizationCode == null || authorizationCode.trim().isEmpty()) {
-            throw new CommonException(ErrorCode.INVALID_INPUT_VALUE);
-        }
-
-        try {
-            KakaoTokenResponse tokenResponse = kakaoOAuth2Service.getAccessToken(authorizationCode);
-            KakaoUserInfoResponse userInfo = kakaoOAuth2Service.getUserInfo(tokenResponse.getAccessToken());
-
-            if (userInfo.getId() == null) {
-                throw new CommonException(ErrorCode.EXTERNAL_SERVICE_ERROR);
-            }
-
-            String socialId = userInfo.getId().toString();
-            String email = userInfo.getKakaoAccount() != null ? userInfo.getKakaoAccount().getEmail() : null;
-            User user = findOrCreateKakaoUser(socialId, email, userInfo);
-
-            JwtTokenDto jwtTokenDto = jwtUtil.generateTokens(user.getId(), user.getRole());
-            user.updateRefreshToken(jwtTokenDto.getRefreshToken());
-            user.updateLoginStatus(true);
-
-            log.info("카카오 로그인 성공 - 사용자 ID: {}, 권한: {}", user.getId(), user.getRole());
-
-            return KakaoLoginResponseDto.of(
-                    jwtTokenDto.getAccessToken(),
-                    jwtTokenDto.getRefreshToken(),
-                    user.getRole(),
-                    user.getId()
-            );
-        } catch (CommonException e) {
-            // CommonException은 그대로 재던지기
-            throw e;
-        } catch (Exception e) {
-            log.error("카카오 로그인 처리 중 예상치 못한 오류: {}", e.getMessage(), e);
-            throw new CommonException(ErrorCode.INTERNAL_SERVER_ERROR);
-        }
-    }
 
     /**
      * 카카오 사용자 조회 또는 생성
@@ -108,15 +67,16 @@ public class AuthService {
                 User existingUser = userOpt.get();
                 // 기존 사용자의 카카오 정보 업데이트
                 updateKakaoUserInfo(existingUser, userInfo);
-                log.info("기존 카카오 사용자 로그인 - 사용자 ID: {}", existingUser.getId());
-                return existingUser;
+                User savedUser = userRepository.save(existingUser);
+                log.info("기존 카카오 사용자 정보 업데이트 - 사용자 ID: {}", savedUser.getId());
+                return savedUser;
             }
 
             // 신규 사용자 생성
             User newUser = createKakaoUser(socialId, email, userInfo);
-            userRepository.save(newUser);
-            log.info("신규 카카오 사용자 생성 - 소셜 ID: {}", socialId);
-            return newUser;
+            User savedUser = userRepository.save(newUser);
+            log.info("신규 카카오 사용자 생성 - 소셜 ID: {}, 사용자 ID: {}", socialId, savedUser.getId());
+            return savedUser;
         } catch (Exception e) {
             log.error("카카오 사용자 처리 중 오류: {}", e.getMessage(), e);
             throw new CommonException(ErrorCode.DATABASE_ERROR);
@@ -125,17 +85,34 @@ public class AuthService {
 
     /**
      * 카카오 사용자 생성
+     * 신규 사용자는 GUEST 권한으로 생성
      */
     private User createKakaoUser(String socialId, String email, KakaoUserInfoResponse userInfo) {
         KakaoUserInfoResponse.KakaoAccount account = userInfo.getKakaoAccount();
 
+        String name = extractName(userInfo);
+        String nickname = extractNickname(userInfo);
+        String profileImage = extractProfileImage(userInfo);
+        String gender = extractGender(userInfo);
+        String ageRange = extractAgeRange(userInfo);
+        String birthday = extractBirthday(userInfo);
+        String birthyear = extractBirthyear(userInfo);
+
+        log.info("신규 카카오 사용자 생성 준비 - Email: {}, Name: {}, Nickname: {}, Gender: {}, AgeRange: {}, Birthday: {}, Birthyear: {}",
+                email, name, nickname, gender, ageRange, birthday, birthyear);
+
         return User.builder()
                 .socialId(socialId)
                 .eProvider(EProvider.KAKAO)
-                .role(ERole.USER)
+                .role(ERole.GUEST)
                 .email(email)
-                .nickname(extractNickname(userInfo))
-                .profileImage(extractProfileImage(userInfo))
+                .name(name)
+                .nickname(nickname)
+                .profileImage(profileImage)
+                .gender(gender)
+                .ageRange(ageRange)
+                .birthday(birthday)
+                .birthyear(birthyear)
                 .build();
     }
 
@@ -145,9 +122,25 @@ public class AuthService {
     private void updateKakaoUserInfo(User user, KakaoUserInfoResponse userInfo) {
         KakaoUserInfoResponse.KakaoAccount account = userInfo.getKakaoAccount();
 
+        String name = extractName(userInfo);
+        String nickname = extractNickname(userInfo);
+        String profileImage = extractProfileImage(userInfo);
+        String gender = extractGender(userInfo);
+        String ageRange = extractAgeRange(userInfo);
+        String birthday = extractBirthday(userInfo);
+        String birthyear = extractBirthyear(userInfo);
+
+        log.info("기존 카카오 사용자 정보 업데이트 준비 - UserID: {}, Name: {}, Nickname: {}, Gender: {}, AgeRange: {}, Birthday: {}, Birthyear: {}",
+                user.getId(), name, nickname, gender, ageRange, birthday, birthyear);
+
         user.updateKakaoUserInfo(
-                extractNickname(userInfo),
-                extractProfileImage(userInfo)
+                name,
+                nickname,
+                profileImage,
+                gender,
+                ageRange,
+                birthday,
+                birthyear
         );
     }
 
@@ -196,6 +189,71 @@ public class AuthService {
                 profile -> profile.getProfileImageUrl(),
                 properties -> properties.getProfileImage(),
                 Constant.DEFAULT_PROFILE_IMAGE);
+    }
+
+    /**
+     * 이름 추출 (kakao_account.name)
+     */
+    private String extractName(KakaoUserInfoResponse userInfo) {
+        if (userInfo.getKakaoAccount() != null) {
+            String name = userInfo.getKakaoAccount().getName();
+            log.debug("카카오 사용자 이름 추출: {}", name);
+            return name;
+        }
+        log.debug("카카오 계정 정보 없음 - 이름 추출 실패");
+        return null;
+    }
+
+    /**
+     * 성별 추출 (kakao_account.gender)
+     */
+    private String extractGender(KakaoUserInfoResponse userInfo) {
+        if (userInfo.getKakaoAccount() != null) {
+            String gender = userInfo.getKakaoAccount().getGender();
+            log.debug("카카오 사용자 성별 추출: {}", gender);
+            return gender;
+        }
+        log.debug("카카오 계정 정보 없음 - 성별 추출 실패");
+        return null;
+    }
+
+    /**
+     * 연령대 추출 (kakao_account.age_range)
+     */
+    private String extractAgeRange(KakaoUserInfoResponse userInfo) {
+        if (userInfo.getKakaoAccount() != null) {
+            String ageRange = userInfo.getKakaoAccount().getAgeRange();
+            log.debug("카카오 사용자 연령대 추출: {}", ageRange);
+            return ageRange;
+        }
+        log.debug("카카오 계정 정보 없음 - 연령대 추출 실패");
+        return null;
+    }
+
+    /**
+     * 생일 추출 (kakao_account.birthday)
+     */
+    private String extractBirthday(KakaoUserInfoResponse userInfo) {
+        if (userInfo.getKakaoAccount() != null) {
+            String birthday = userInfo.getKakaoAccount().getBirthday();
+            log.debug("카카오 사용자 생일 추출: {}", birthday);
+            return birthday;
+        }
+        log.debug("카카오 계정 정보 없음 - 생일 추출 실패");
+        return null;
+    }
+
+    /**
+     * 출생연도 추출 (kakao_account.birthyear)
+     */
+    private String extractBirthyear(KakaoUserInfoResponse userInfo) {
+        if (userInfo.getKakaoAccount() != null) {
+            String birthyear = userInfo.getKakaoAccount().getBirthyear();
+            log.debug("카카오 사용자 출생연도 추출: {}", birthyear);
+            return birthyear;
+        }
+        log.debug("카카오 계정 정보 없음 - 출생연도 추출 실패");
+        return null;
     }
 
 
@@ -303,10 +361,10 @@ public class AuthService {
                     user.getId(), shouldRotateRefreshToken);
 
             return KakaoLoginResponseDto.of(
-                    newAccessToken,
-                    newRefreshToken,
+                    user.getId(),
                     user.getRole(),
-                    user.getId()
+                    newAccessToken,
+                    newRefreshToken
             );
 
         } catch (CommonException e) {
@@ -336,5 +394,175 @@ public class AuthService {
             log.error("로그아웃 처리 중 예상치 못한 오류: {}", e.getMessage(), e);
             throw new CommonException(ErrorCode.INTERNAL_SERVER_ERROR);
         }
+    }
+
+    /**
+     * 카카오 Access Token으로 인증 (모바일 SDK 방식 - B안)
+     * 모바일 앱에서 획득한 카카오 Access Token을 검증하고 서비스 JWT 발급
+     */
+    @Transactional
+    public KakaoLoginResponseDto authenticateWithKakaoAccessToken(String kakaoAccessToken) {
+        if (kakaoAccessToken == null || kakaoAccessToken.trim().isEmpty()) {
+            throw new CommonException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+
+        try {
+            // 1. 카카오 Access Token 검증 (app_id 확인 및 만료 검증)
+            KakaoAccessTokenInfoResponse tokenInfo = kakaoOAuth2Service.getAccessTokenInfo(kakaoAccessToken);
+
+            if (tokenInfo.getId() == null) {
+                throw new CommonException(ErrorCode.EXTERNAL_SERVICE_ERROR);
+            }
+
+            // 2. 카카오 사용자 정보 조회
+            KakaoUserInfoResponse userInfo = kakaoOAuth2Service.getUserInfo(kakaoAccessToken);
+
+            String socialId = tokenInfo.getId().toString();
+            String email = userInfo.getKakaoAccount() != null ? userInfo.getKakaoAccount().getEmail() : null;
+
+            // 3. 사용자 조회 또는 생성
+            User user = findOrCreateKakaoUser(socialId, email, userInfo);
+
+            // 4. 서비스 JWT 토큰 발급
+            JwtTokenDto jwtTokenDto = jwtUtil.generateTokens(user.getId(), user.getRole());
+            user.updateRefreshToken(jwtTokenDto.getRefreshToken());
+            user.updateLoginStatus(true);
+
+            log.info("카카오 SDK 로그인 성공 - 사용자 ID: {}, 권한: {}", user.getId(), user.getRole());
+
+            return KakaoLoginResponseDto.of(
+                    user.getId(),
+                    user.getRole(),
+                    jwtTokenDto.getAccessToken(),
+                    jwtTokenDto.getRefreshToken()
+            );
+        } catch (CommonException e) {
+            // CommonException은 그대로 재던지기
+            throw e;
+        } catch (Exception e) {
+            log.error("카카오 SDK 로그인 처리 중 예상치 못한 오류: {}", e.getMessage(), e);
+            throw new CommonException(ErrorCode.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    /**
+     * 회원가입 처리 (GUEST → USER 권한 전환)
+     * 닉네임과 프로필 이미지를 업데이트하고 권한을 USER로 변경
+     */
+    @Transactional
+    public RegisterResponseDto register(Long userId, String nickname, MultipartFile profileImage) {
+        try {
+            // 1. 사용자 조회
+            User user = userRepository.findById(userId)
+                    .orElseThrow(() -> new CommonException(ErrorCode.USER_NOT_FOUND));
+
+            // 2. 이미 USER 권한인지 확인
+            if (user.getRole() == ERole.USER) {
+                throw new CommonException(ErrorCode.ALREADY_REGISTERED_USER);
+            }
+
+            // 3. 닉네임 처리 (입력하지 않은 경우 카카오 닉네임 유지)
+            String finalNickname = (nickname != null && !nickname.trim().isEmpty())
+                    ? nickname
+                    : user.getNickname();
+
+            // 4. 프로필 이미지 처리
+            String finalProfileImage = user.getProfileImage();
+            if (profileImage != null && !profileImage.isEmpty()) {
+                // 프로필 이미지 업로드
+                finalProfileImage = uploadProfileImage(profileImage);
+            }
+            // 입력하지 않은 경우 카카오 프로필 이미지 유지
+
+            // 5. 사용자 정보 업데이트
+            user.updateNickname(finalNickname);
+            user.updateProfileImage(finalProfileImage);
+            user.updateRole(ERole.USER);
+
+            User savedUser = userRepository.save(user);
+
+            // 6. role 변경으로 인한 새로운 JWT 토큰 발급
+            JwtTokenDto jwtTokenDto = jwtUtil.generateTokens(savedUser.getId(), savedUser.getRole());
+            savedUser.updateRefreshToken(jwtTokenDto.getRefreshToken());
+            userRepository.save(savedUser);
+
+            log.info("회원가입 완료 - 사용자 ID: {}, 닉네임: {}, 권한: {}, 새 토큰 발급",
+                    savedUser.getId(), savedUser.getNickname(), savedUser.getRole());
+
+            return RegisterResponseDto.of(
+                    savedUser.getId(),
+                    savedUser.getRole().toString(),
+                    savedUser.getNickname(),
+                    savedUser.getProfileImage(),
+                    jwtTokenDto.getAccessToken(),
+                    jwtTokenDto.getRefreshToken()
+            );
+
+        } catch (CommonException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("회원가입 처리 중 예상치 못한 오류: {}", e.getMessage(), e);
+            throw new CommonException(ErrorCode.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    /**
+     * 프로필 이미지 업로드
+     */
+    private String uploadProfileImage(MultipartFile file) {
+        // 이미지 파일 검증
+        validateProfileImage(file);
+
+        // 파일 키 생성 (profiles/{yyyy}/{MM}/{uuid}.{ext})
+        String key = generateProfileImageKey(file.getOriginalFilename());
+
+        // Object Storage에 업로드
+        objectStorageService.upload(s3Properties.getBucket(), key, file);
+
+        // URL 생성 및 반환
+        String fileUrl = s3UrlGenerator.generateUrl(key);
+        log.info("프로필 이미지 업로드 완료 - URL: {}", fileUrl);
+
+        return fileUrl;
+    }
+
+    /**
+     * 프로필 이미지 파일 검증
+     */
+    private void validateProfileImage(MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            throw new CommonException(ErrorCode.INVALID_INPUT_VALUE, "파일이 비어있습니다.");
+        }
+
+        // MIME 타입 검증
+        String contentType = file.getContentType();
+        if (contentType == null || !contentType.startsWith("image/")) {
+            throw new CommonException(ErrorCode.INVALID_FILE_FORMAT,
+                    "이미지 파일만 업로드할 수 있습니다.");
+        }
+
+        // 파일 크기 검증 (5MB)
+        long maxSize = 5 * 1024 * 1024;
+        if (file.getSize() > maxSize) {
+            throw new CommonException(ErrorCode.FILE_SIZE_EXCEEDED,
+                    "프로필 이미지는 5MB를 초과할 수 없습니다.");
+        }
+    }
+
+    /**
+     * 프로필 이미지 키 생성
+     */
+    private String generateProfileImageKey(String originalFilename) {
+        String extension = "";
+        if (originalFilename != null && originalFilename.contains(".")) {
+            extension = originalFilename.substring(originalFilename.lastIndexOf("."));
+        }
+
+        LocalDate now = LocalDate.now();
+        String datePath = now.format(DateTimeFormatter.ofPattern("yyyy/MM"));
+        String uuid = UUID.randomUUID().toString();
+
+        // 키 규칙: profiles/{yyyy}/{MM}/{uuid}.{ext}
+        return "profiles/" + datePath + "/" + uuid + extension;
     }
 }

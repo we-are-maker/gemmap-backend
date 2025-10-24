@@ -65,15 +65,31 @@ public class User {
     @Column(name = "email")
     private String email;
 
+    @Column(name = "name")
+    private String name;
+
     @Column(name = "nickname", unique = true)
     private String nickname;
 
     @Column(name = "profile_image")
     private String profileImage;
 
+    @Column(name = "gender")
+    private String gender;
+
+    @Column(name = "age_range")
+    private String ageRange;
+
+    @Column(name = "birthday")
+    private String birthday;
+
+    @Column(name = "birthyear")
+    private String birthyear;
+
     @Builder
-    public User(String socialId, EProvider eProvider, ERole role, String email,
-                String nickname, String profileImage) {
+    public User(String socialId, EProvider eProvider, ERole role, String email, String name,
+                String nickname, String profileImage, String gender, String ageRange,
+                String birthday, String birthyear) {
         this.socialId = socialId;
         this.eProvider = eProvider;
         this.role = role;
@@ -81,8 +97,13 @@ public class User {
         this.isLogin = false;
         this.isDeleted = false;
         this.email = email;
+        this.name = name;
         this.nickname = nickname;
         this.profileImage = profileImage != null ? profileImage : Constant.DEFAULT_PROFILE_IMAGE;
+        this.gender = gender;
+        this.ageRange = ageRange;
+        this.birthday = birthday;
+        this.birthyear = birthyear;
     }
 
     public void updateNickname(String nickname) {
@@ -111,9 +132,15 @@ public class User {
         this.profileImage = profileImage;
     }
 
-    public void updateKakaoUserInfo(String nickname, String profileImage) {
+    public void updateKakaoUserInfo(String name, String nickname, String profileImage,
+                                    String gender, String ageRange, String birthday, String birthyear) {
+        if (name != null) this.name = name;
         if (nickname != null) this.nickname = nickname;
         if (profileImage != null) this.profileImage = profileImage;
+        if (gender != null) this.gender = gender;
+        if (ageRange != null) this.ageRange = ageRange;
+        if (birthday != null) this.birthday = birthday;
+        if (birthyear != null) this.birthyear = birthyear;
     }
 
     /**
