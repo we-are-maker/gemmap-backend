@@ -3,7 +3,12 @@ package com.gemmap.gemmap.auth.presentation;
 import com.gemmap.gemmap.auth.application.dto.response.KakaoLoginResponseDto;
 import com.gemmap.gemmap.auth.application.service.AuthService;
 import com.gemmap.gemmap.shared.common.annotation.UserId;
+import com.gemmap.gemmap.shared.common.constants.Constant;
 import com.gemmap.gemmap.shared.common.dto.ResponseDto;
+import com.gemmap.gemmap.shared.exception.CommonException;
+import com.gemmap.gemmap.shared.exception.ErrorCode;
+import com.gemmap.gemmap.shared.util.HeaderUtil;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import lombok.RequiredArgsConstructor;
@@ -41,6 +46,23 @@ public class AuthController {
             @RequestParam(value = "state", required = false) String state) {
         KakaoLoginResponseDto loginResponse = authService.kakaoLogin(code);
         log.info("카카오 로그인 성공 - 사용자 ID: {}", loginResponse.userId());
+        return ResponseDto.ok(loginResponse);
+    }
+
+    /**
+     * 카카오 로그인 (모바일 SDK 방식)
+     * 모바일 앱에서 획득한 카카오 Access Token으로 인증
+     */
+    @PostMapping("/kakao/login")
+    public ResponseDto<KakaoLoginResponseDto> kakaoSdkLogin(HttpServletRequest request) {
+        log.info("카카오 SDK 로그인 요청");
+
+        // Authorization 헤더에서 카카오 Access Token 추출
+        String kakaoAccessToken = HeaderUtil.refineHeader(request, Constant.AUTHORIZATION_HEADER, Constant.BEARER_PREFIX)
+                .orElseThrow(() -> new CommonException(ErrorCode.INVALID_TOKEN));
+
+        KakaoLoginResponseDto loginResponse = authService.authenticateWithKakaoAccessToken(kakaoAccessToken);
+        log.info("카카오 SDK 로그인 성공 - 사용자 ID: {}", loginResponse.userId());
         return ResponseDto.ok(loginResponse);
     }
 

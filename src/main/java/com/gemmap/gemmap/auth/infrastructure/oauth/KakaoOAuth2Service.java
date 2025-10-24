@@ -1,5 +1,6 @@
 package com.gemmap.gemmap.auth.infrastructure.oauth;
 
+import com.gemmap.gemmap.auth.application.dto.kakao.KakaoAccessTokenInfoResponse;
 import com.gemmap.gemmap.auth.application.dto.kakao.KakaoTokenResponse;
 import com.gemmap.gemmap.auth.application.dto.kakao.KakaoUserInfoResponse;
 import com.gemmap.gemmap.shared.exception.CommonException;
@@ -33,14 +34,18 @@ public class KakaoOAuth2Service {
     @Value("${oauth2.kakao.redirect-uri}")
     private String redirectUri;
 
+    @Value("${oauth2.kakao.app-id}")
+    private Long appId;
+
     private static final String KAUTH_HOST = "https://kauth.kakao.com";
     private static final String KAPI_HOST = "https://kapi.kakao.com";
     private static final String TOKEN_ENDPOINT = "/oauth/token";
     private static final String USER_INFO_ENDPOINT = "/v2/user/me";
+    private static final String ACCESS_TOKEN_INFO_ENDPOINT = "/v1/user/access_token_info";
     private static final String LOGOUT_ENDPOINT = "/v1/user/logout";
     private static final String AUTHORIZE_ENDPOINT = "/oauth/authorize";
     private static final String DEFAULT_SCOPE = "profile_nickname profile_image account_email name gender age_range birthday birthyear";
-    private static final String PROPERTY_KEYS = "[\"kakao_account.profile\", \"kakao_account.email\"]";
+    private static final String PROPERTY_KEYS = "[\"kakao_account.profile\", \"kakao_account.email\", \"kakao_account.name\", \"kakao_account.gender\", \"kakao_account.age_range\", \"kakao_account.birthday\", \"kakao_account.birthyear\"]";
 
     /**
      * 카카오 인가 코드 요청 URL 생성
@@ -112,6 +117,8 @@ public class KakaoOAuth2Service {
 
         HttpEntity<MultiValueMap<String, String>> request = new HttpEntity<>(params, headers);
 
+        log.debug("카카오 사용자 정보 요청 - property_keys: {}", PROPERTY_KEYS);
+
         try {
             ResponseEntity<KakaoUserInfoResponse> response = restTemplate.exchange(
                     KAPI_HOST + USER_INFO_ENDPOINT,
@@ -121,7 +128,17 @@ public class KakaoOAuth2Service {
             );
 
             if (response.getStatusCode() == HttpStatus.OK && response.getBody() != null) {
-                return response.getBody();
+                KakaoUserInfoResponse userInfo = response.getBody();
+                log.debug("카카오 사용자 정보 응답 - ID: {}, Email: {}, Name: {}, Gender: {}, AgeRange: {}, Birthday: {}, Birthyear: {}",
+                        userInfo.getId(),
+                        userInfo.getKakaoAccount() != null ? userInfo.getKakaoAccount().getEmail() : null,
+                        userInfo.getKakaoAccount() != null ? userInfo.getKakaoAccount().getName() : null,
+                        userInfo.getKakaoAccount() != null ? userInfo.getKakaoAccount().getGender() : null,
+                        userInfo.getKakaoAccount() != null ? userInfo.getKakaoAccount().getAgeRange() : null,
+                        userInfo.getKakaoAccount() != null ? userInfo.getKakaoAccount().getBirthday() : null,
+                        userInfo.getKakaoAccount() != null ? userInfo.getKakaoAccount().getBirthyear() : null
+                );
+                return userInfo;
             }
 
             log.error("카카오 사용자 정보 조회 실패: {}", response.getStatusCode());
@@ -130,6 +147,47 @@ public class KakaoOAuth2Service {
         } catch (Exception e) {
             log.error("카카오 사용자 정보 조회 중 오류 발생: {}", e.getMessage(), e);
             throw new CommonException(ErrorCode.KAKAO_USER_INFO_REQUEST_FAILED);
+        }
+    }
+
+    /**
+     * Access Token 정보 조회 및 검증
+     * 모바일 SDK 방식에서 사용
+     */
+    public KakaoAccessTokenInfoResponse getAccessTokenInfo(String accessToken) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(accessToken);
+
+        HttpEntity<String> request = new HttpEntity<>(headers);
+
+        try {
+            ResponseEntity<KakaoAccessTokenInfoResponse> response = restTemplate.exchange(
+                    KAPI_HOST + ACCESS_TOKEN_INFO_ENDPOINT,
+                    HttpMethod.GET,
+                    request,
+                    KakaoAccessTokenInfoResponse.class
+            );
+
+            if (response.getStatusCode() == HttpStatus.OK && response.getBody() != null) {
+                KakaoAccessTokenInfoResponse tokenInfo = response.getBody();
+
+                // app_id 검증
+                if (!tokenInfo.getAppId().equals(appId)) {
+                    log.error("카카오 앱 ID 불일치 - 예상: {}, 실제: {}", appId, tokenInfo.getAppId());
+                    throw new CommonException(ErrorCode.INVALID_TOKEN);
+                }
+
+                return tokenInfo;
+            }
+
+            log.error("카카오 액세스 토큰 정보 조회 실패: {}", response.getStatusCode());
+            throw new CommonException(ErrorCode.KAKAO_TOKEN_REQUEST_FAILED);
+
+        } catch (CommonException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("카카오 액세스 토큰 정보 조회 중 오류 발생: {}", e.getMessage(), e);
+            throw new CommonException(ErrorCode.KAKAO_TOKEN_REQUEST_FAILED);
         }
     }
 

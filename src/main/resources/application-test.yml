@@ -30,6 +30,7 @@ oauth2:
     client-id: "test-kakao-client-id"
     client-secret: "test-kakao-client-secret"
     redirect-uri: "http://localhost:8080/api/v1/auth/kakao/callback"
+    app-id: 1234567890
 
 # S3 설정 (테스트용)
 s3:

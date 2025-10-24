@@ -31,6 +31,14 @@ public class KakaoUserInfoResponse {
     public static class KakaoAccount {
         private Profile profile;
         private String email;
+        private String name;
+        private String gender;
+
+        @JsonProperty("age_range")
+        private String ageRange;
+
+        private String birthday;
+        private String birthyear;
 
         @Getter
         @NoArgsConstructor

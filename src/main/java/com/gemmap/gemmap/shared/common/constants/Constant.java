@@ -23,6 +23,7 @@ public class Constant {
     public static final String[] NO_NEED_AUTH_URLS = {
             "/api/v1/auth/login/kakao",
             "/api/v1/auth/kakao/callback",
+            "/api/v1/auth/kakao/login",
             "/api/v1/auth/register",
             "/api/v1/test",
             "/swagger-ui.html",
