@@ -24,7 +24,7 @@ public class Constant {
             "/api/v1/auth/login/kakao",
             "/api/v1/auth/kakao/callback",
             "/api/v1/auth/kakao/login",
-            "/api/v1/auth/register",
+//            "/api/v1/auth/register",
             "/api/v1/test",
             "/swagger-ui.html",
             "/swagger-ui/**",

@@ -1,6 +1,7 @@
 package com.gemmap.gemmap.auth.presentation;
 
 import com.gemmap.gemmap.auth.application.dto.response.KakaoLoginResponseDto;
+import com.gemmap.gemmap.auth.application.dto.response.RegisterResponseDto;
 import com.gemmap.gemmap.auth.application.service.AuthService;
 import com.gemmap.gemmap.shared.common.annotation.UserId;
 import com.gemmap.gemmap.shared.common.constants.Constant;
@@ -14,6 +15,7 @@ import java.io.IOException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 /**
  * 인증 관련 REST API 컨트롤러
@@ -86,5 +88,21 @@ public class AuthController {
         log.info("서비스 로그아웃 요청 - 사용자 ID: {}", userId);
         authService.simpleLogout(userId);
         return ResponseDto.noContent();
+    }
+
+    /**
+     * 회원가입 (GUEST → USER 권한 전환)
+     * 닉네임과 프로필 이미지를 업데이트하고 권한을 USER로 변경
+     */
+    @PostMapping("/register")
+    public ResponseDto<RegisterResponseDto> register(
+            @UserId Long userId,
+            @RequestParam(value = "nickname", required = false) String nickname,
+            @RequestParam(value = "profileImage", required = false) MultipartFile profileImage) {
+        log.info("회원가입 요청 - 사용자 ID: {}, 닉네임 입력 여부: {}, 프로필 이미지 업로드 여부: {}",
+                userId, nickname != null, profileImage != null && !profileImage.isEmpty());
+
+        RegisterResponseDto response = authService.register(userId, nickname, profileImage);
+        return ResponseDto.ok(response);
     }
 }

@@ -5,22 +5,30 @@ import com.gemmap.gemmap.auth.application.dto.kakao.KakaoTokenResponse;
 import com.gemmap.gemmap.auth.application.dto.kakao.KakaoUserInfoResponse;
 import com.gemmap.gemmap.auth.application.dto.response.KakaoLoginResponseDto;
 import com.gemmap.gemmap.auth.application.dto.response.KakaoTokenRefreshResponseDto;
+import com.gemmap.gemmap.auth.application.dto.response.RegisterResponseDto;
 import com.gemmap.gemmap.auth.domain.entity.User;
 import com.gemmap.gemmap.auth.domain.repository.UserRepository;
 import com.gemmap.gemmap.auth.infrastructure.jwt.JwtTokenDto;
 import com.gemmap.gemmap.auth.infrastructure.jwt.JwtUtil;
 import com.gemmap.gemmap.auth.infrastructure.oauth.KakaoOAuth2Service;
+import com.gemmap.gemmap.image.infrastructure.objectstorage.ObjectStorageService;
+import com.gemmap.gemmap.image.infrastructure.objectstorage.S3UrlGenerator;
 import com.gemmap.gemmap.shared.common.constants.Constant;
 import com.gemmap.gemmap.shared.common.enums.EProvider;
 import com.gemmap.gemmap.shared.common.enums.ERole;
+import com.gemmap.gemmap.shared.config.s3.S3Properties;
 import com.gemmap.gemmap.shared.exception.CommonException;
 import com.gemmap.gemmap.shared.exception.ErrorCode;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.Optional;
+import java.util.UUID;
 
 /**
  * 인증 관련 비즈니스 로직을 처리하는 서비스 클래스
@@ -39,6 +47,9 @@ public class AuthService {
     private final UserRepository userRepository;
     private final JwtUtil jwtUtil;
     private final KakaoOAuth2Service kakaoOAuth2Service;
+    private final ObjectStorageService objectStorageService;
+    private final S3UrlGenerator s3UrlGenerator;
+    private final S3Properties s3Properties;
 
     /**
      * 카카오 인가 URL 생성
@@ -80,10 +91,10 @@ public class AuthService {
             log.info("카카오 로그인 성공 - 사용자 ID: {}, 권한: {}", user.getId(), user.getRole());
 
             return KakaoLoginResponseDto.of(
-                    jwtTokenDto.getAccessToken(),
-                    jwtTokenDto.getRefreshToken(),
+                    user.getId(),
                     user.getRole(),
-                    user.getId()
+                    jwtTokenDto.getAccessToken(),
+                    jwtTokenDto.getRefreshToken()
             );
         } catch (CommonException e) {
             // CommonException은 그대로 재던지기
@@ -403,10 +414,10 @@ public class AuthService {
                     user.getId(), shouldRotateRefreshToken);
 
             return KakaoLoginResponseDto.of(
-                    newAccessToken,
-                    newRefreshToken,
+                    user.getId(),
                     user.getRole(),
-                    user.getId()
+                    newAccessToken,
+                    newRefreshToken
             );
 
         } catch (CommonException e) {
@@ -473,10 +484,10 @@ public class AuthService {
             log.info("카카오 SDK 로그인 성공 - 사용자 ID: {}, 권한: {}", user.getId(), user.getRole());
 
             return KakaoLoginResponseDto.of(
-                    jwtTokenDto.getAccessToken(),
-                    jwtTokenDto.getRefreshToken(),
+                    user.getId(),
                     user.getRole(),
-                    user.getId()
+                    jwtTokenDto.getAccessToken(),
+                    jwtTokenDto.getRefreshToken()
             );
         } catch (CommonException e) {
             // CommonException은 그대로 재던지기
@@ -485,5 +496,126 @@ public class AuthService {
             log.error("카카오 SDK 로그인 처리 중 예상치 못한 오류: {}", e.getMessage(), e);
             throw new CommonException(ErrorCode.INTERNAL_SERVER_ERROR);
         }
+    }
+
+    /**
+     * 회원가입 처리 (GUEST → USER 권한 전환)
+     * 닉네임과 프로필 이미지를 업데이트하고 권한을 USER로 변경
+     */
+    @Transactional
+    public RegisterResponseDto register(Long userId, String nickname, MultipartFile profileImage) {
+        try {
+            // 1. 사용자 조회
+            User user = userRepository.findById(userId)
+                    .orElseThrow(() -> new CommonException(ErrorCode.USER_NOT_FOUND));
+
+            // 2. 이미 USER 권한인지 확인
+            if (user.getRole() == ERole.USER) {
+                throw new CommonException(ErrorCode.ALREADY_REGISTERED_USER);
+            }
+
+            // 3. 닉네임 처리 (입력하지 않은 경우 카카오 닉네임 유지)
+            String finalNickname = (nickname != null && !nickname.trim().isEmpty())
+                    ? nickname
+                    : user.getNickname();
+
+            // 4. 프로필 이미지 처리
+            String finalProfileImage = user.getProfileImage();
+            if (profileImage != null && !profileImage.isEmpty()) {
+                // 프로필 이미지 업로드
+                finalProfileImage = uploadProfileImage(profileImage);
+            }
+            // 입력하지 않은 경우 카카오 프로필 이미지 유지
+
+            // 5. 사용자 정보 업데이트
+            user.updateNickname(finalNickname);
+            user.updateProfileImage(finalProfileImage);
+            user.updateRole(ERole.USER);
+
+            User savedUser = userRepository.save(user);
+
+            // 6. role 변경으로 인한 새로운 JWT 토큰 발급
+            JwtTokenDto jwtTokenDto = jwtUtil.generateTokens(savedUser.getId(), savedUser.getRole());
+            savedUser.updateRefreshToken(jwtTokenDto.getRefreshToken());
+            userRepository.save(savedUser);
+
+            log.info("회원가입 완료 - 사용자 ID: {}, 닉네임: {}, 권한: {}, 새 토큰 발급",
+                    savedUser.getId(), savedUser.getNickname(), savedUser.getRole());
+
+            return RegisterResponseDto.of(
+                    savedUser.getId(),
+                    savedUser.getRole().toString(),
+                    savedUser.getNickname(),
+                    savedUser.getProfileImage(),
+                    jwtTokenDto.getAccessToken(),
+                    jwtTokenDto.getRefreshToken()
+            );
+
+        } catch (CommonException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("회원가입 처리 중 예상치 못한 오류: {}", e.getMessage(), e);
+            throw new CommonException(ErrorCode.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    /**
+     * 프로필 이미지 업로드
+     */
+    private String uploadProfileImage(MultipartFile file) {
+        // 이미지 파일 검증
+        validateProfileImage(file);
+
+        // 파일 키 생성 (profiles/{yyyy}/{MM}/{uuid}.{ext})
+        String key = generateProfileImageKey(file.getOriginalFilename());
+
+        // Object Storage에 업로드
+        objectStorageService.upload(s3Properties.getBucket(), key, file);
+
+        // URL 생성 및 반환
+        String fileUrl = s3UrlGenerator.generateUrl(key);
+        log.info("프로필 이미지 업로드 완료 - URL: {}", fileUrl);
+
+        return fileUrl;
+    }
+
+    /**
+     * 프로필 이미지 파일 검증
+     */
+    private void validateProfileImage(MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            throw new CommonException(ErrorCode.INVALID_INPUT_VALUE, "파일이 비어있습니다.");
+        }
+
+        // MIME 타입 검증
+        String contentType = file.getContentType();
+        if (contentType == null || !contentType.startsWith("image/")) {
+            throw new CommonException(ErrorCode.INVALID_FILE_FORMAT,
+                    "이미지 파일만 업로드할 수 있습니다.");
+        }
+
+        // 파일 크기 검증 (5MB)
+        long maxSize = 5 * 1024 * 1024;
+        if (file.getSize() > maxSize) {
+            throw new CommonException(ErrorCode.FILE_SIZE_EXCEEDED,
+                    "프로필 이미지는 5MB를 초과할 수 없습니다.");
+        }
+    }
+
+    /**
+     * 프로필 이미지 키 생성
+     */
+    private String generateProfileImageKey(String originalFilename) {
+        String extension = "";
+        if (originalFilename != null && originalFilename.contains(".")) {
+            extension = originalFilename.substring(originalFilename.lastIndexOf("."));
+        }
+
+        LocalDate now = LocalDate.now();
+        String datePath = now.format(DateTimeFormatter.ofPattern("yyyy/MM"));
+        String uuid = UUID.randomUUID().toString();
+
+        // 키 규칙: profiles/{yyyy}/{MM}/{uuid}.{ext}
+        return "profiles/" + datePath + "/" + uuid + extension;
     }
 }
