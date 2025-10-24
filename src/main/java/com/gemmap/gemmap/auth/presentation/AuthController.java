@@ -29,29 +29,6 @@ public class AuthController {
     private final AuthService authService;
 
     /**
-     * 카카오 로그인 시작 (리다이렉트 방식)
-     */
-    @PostMapping("/login/kakao")
-    public void startKakaoLogin(HttpServletResponse response) throws IOException {
-        log.info("카카오 로그인 시작 요청");
-        String authUrl = authService.getKakaoAuthorizationUrl();
-        // 카카오 로그인 페이지로 리다이렉트
-        response.sendRedirect(authUrl);
-    }
-
-    /**
-     * 카카오 로그인 콜백 처리 (브라우저 리다이렉트)
-     */
-    @GetMapping("/kakao/callback")
-    public ResponseDto<KakaoLoginResponseDto> kakaoCallback(
-            @RequestParam("code") String code,
-            @RequestParam(value = "state", required = false) String state) {
-        KakaoLoginResponseDto loginResponse = authService.kakaoLogin(code);
-        log.info("카카오 로그인 성공 - 사용자 ID: {}", loginResponse.userId());
-        return ResponseDto.ok(loginResponse);
-    }
-
-    /**
      * 카카오 로그인 (모바일 SDK 방식)
      * 모바일 앱에서 획득한 카카오 Access Token으로 인증
      */

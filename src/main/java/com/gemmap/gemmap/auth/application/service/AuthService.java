@@ -51,59 +51,6 @@ public class AuthService {
     private final S3UrlGenerator s3UrlGenerator;
     private final S3Properties s3Properties;
 
-    /**
-     * 카카오 인가 URL 생성
-     */
-    public String getKakaoAuthorizationUrl() {
-        try {
-            return kakaoOAuth2Service.getAuthorizationUrl();
-        } catch (Exception e) {
-            log.error("카카오 인가 URL 생성 실패: {}", e.getMessage());
-            throw new CommonException(ErrorCode.EXTERNAL_SERVICE_ERROR);
-        }
-    }
-
-    /**
-    * 카카오 로그인 처리 (인가 코드로 로그인)
-    */
-    @Transactional
-    public KakaoLoginResponseDto kakaoLogin(String authorizationCode) {
-        if (authorizationCode == null || authorizationCode.trim().isEmpty()) {
-            throw new CommonException(ErrorCode.INVALID_INPUT_VALUE);
-        }
-
-        try {
-            KakaoTokenResponse tokenResponse = kakaoOAuth2Service.getAccessToken(authorizationCode);
-            KakaoUserInfoResponse userInfo = kakaoOAuth2Service.getUserInfo(tokenResponse.getAccessToken());
-
-            if (userInfo.getId() == null) {
-                throw new CommonException(ErrorCode.EXTERNAL_SERVICE_ERROR);
-            }
-
-            String socialId = userInfo.getId().toString();
-            String email = userInfo.getKakaoAccount() != null ? userInfo.getKakaoAccount().getEmail() : null;
-            User user = findOrCreateKakaoUser(socialId, email, userInfo);
-
-            JwtTokenDto jwtTokenDto = jwtUtil.generateTokens(user.getId(), user.getRole());
-            user.updateRefreshToken(jwtTokenDto.getRefreshToken());
-            user.updateLoginStatus(true);
-
-            log.info("카카오 로그인 성공 - 사용자 ID: {}, 권한: {}", user.getId(), user.getRole());
-
-            return KakaoLoginResponseDto.of(
-                    user.getId(),
-                    user.getRole(),
-                    jwtTokenDto.getAccessToken(),
-                    jwtTokenDto.getRefreshToken()
-            );
-        } catch (CommonException e) {
-            // CommonException은 그대로 재던지기
-            throw e;
-        } catch (Exception e) {
-            log.error("카카오 로그인 처리 중 예상치 못한 오류: {}", e.getMessage(), e);
-            throw new CommonException(ErrorCode.INTERNAL_SERVER_ERROR);
-        }
-    }
 
     /**
      * 카카오 사용자 조회 또는 생성
