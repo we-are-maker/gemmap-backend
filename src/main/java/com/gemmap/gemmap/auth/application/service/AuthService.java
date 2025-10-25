@@ -456,32 +456,36 @@ public class AuthService {
             User user = userRepository.findById(userId)
                     .orElseThrow(() -> new CommonException(ErrorCode.USER_NOT_FOUND));
 
-            // 2. 이미 USER 권한인지 확인
+            // 2. 사용자 로그인 상태 확인
+            if (!user.isLogin()) {
+                throw new CommonException(ErrorCode.USER_NOT_LOGGED_IN);
+            }
+
+            // 3. 이미 USER 권한인지 확인
             if (user.getRole() == ERole.USER) {
                 throw new CommonException(ErrorCode.ALREADY_REGISTERED_USER);
             }
 
-            // 3. 닉네임 처리 (입력하지 않은 경우 카카오 닉네임 유지)
+            // 4. 닉네임 처리 (입력하지 않은 경우 카카오 닉네임 유지)
             String finalNickname = (nickname != null && !nickname.trim().isEmpty())
                     ? nickname
                     : user.getNickname();
 
-            // 4. 프로필 이미지 처리
+            // 5. 프로필 이미지 처리 (입력하지 않은 경우 카카오 프로필 이미지 유지)
             String finalProfileImage = user.getProfileImage();
             if (profileImage != null && !profileImage.isEmpty()) {
                 // 프로필 이미지 업로드
                 finalProfileImage = uploadProfileImage(profileImage);
             }
-            // 입력하지 않은 경우 카카오 프로필 이미지 유지
 
-            // 5. 사용자 정보 업데이트
+            // 6. 사용자 정보 업데이트
             user.updateNickname(finalNickname);
             user.updateProfileImage(finalProfileImage);
             user.updateRole(ERole.USER);
 
             User savedUser = userRepository.save(user);
 
-            // 6. role 변경으로 인한 새로운 JWT 토큰 발급
+            // 7. role 변경으로 인한 새로운 JWT 토큰 발급
             JwtTokenDto jwtTokenDto = jwtUtil.generateTokens(savedUser.getId(), savedUser.getRole());
             savedUser.updateRefreshToken(jwtTokenDto.getRefreshToken());
             userRepository.save(savedUser);
@@ -537,15 +541,13 @@ public class AuthService {
         // MIME 타입 검증
         String contentType = file.getContentType();
         if (contentType == null || !contentType.startsWith("image/")) {
-            throw new CommonException(ErrorCode.INVALID_FILE_FORMAT,
-                    "이미지 파일만 업로드할 수 있습니다.");
+            throw new CommonException(ErrorCode.INVALID_FILE_FORMAT);
         }
 
         // 파일 크기 검증 (5MB)
         long maxSize = 5 * 1024 * 1024;
         if (file.getSize() > maxSize) {
-            throw new CommonException(ErrorCode.FILE_SIZE_EXCEEDED,
-                    "프로필 이미지는 5MB를 초과할 수 없습니다.");
+            throw new CommonException(ErrorCode.FILE_SIZE_EXCEEDED);
         }
     }
 

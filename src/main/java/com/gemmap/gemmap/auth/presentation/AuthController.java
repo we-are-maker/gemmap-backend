@@ -46,6 +46,22 @@ public class AuthController {
     }
 
     /**
+     * 회원가입 (GUEST → USER 권한 전환)
+     * 닉네임과 프로필 이미지를 업데이트하고 권한을 USER로 변경
+     */
+    @PostMapping("/register")
+    public ResponseDto<RegisterResponseDto> register(
+            @UserId Long userId,
+            @RequestParam(value = "nickname", required = false) String nickname,
+            @RequestParam(value = "profileImage", required = false) MultipartFile profileImage) {
+        log.info("회원가입 요청 - 사용자 ID: {}, 닉네임 입력 여부: {}, 프로필 이미지 업로드 여부: {}",
+                userId, nickname != null, profileImage != null && !profileImage.isEmpty());
+
+        RegisterResponseDto response = authService.register(userId, nickname, profileImage);
+        return ResponseDto.ok(response);
+    }
+
+    /**
      * 서비스 토큰 갱신
      * 서비스 JWT 액세스 토큰 갱신
      */
