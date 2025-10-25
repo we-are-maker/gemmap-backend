@@ -58,28 +58,13 @@ public class AuthController {
 
     /**
      * 서비스 로그아웃
-     * 클라이언트에서 토큰을 삭제하도록 하는 로그아웃
+     * 리프레시 토큰을 삭제하도록 하는 로그아웃
      */
     @PostMapping("/logout")
     public ResponseDto<?> logout(@UserId Long userId) {
         log.info("서비스 로그아웃 요청 - 사용자 ID: {}", userId);
-        authService.simpleLogout(userId);
+
+        authService.logout(userId);
         return ResponseDto.noContent();
-    }
-
-    /**
-     * 회원가입 (GUEST → USER 권한 전환)
-     * 닉네임과 프로필 이미지를 업데이트하고 권한을 USER로 변경
-     */
-    @PostMapping("/register")
-    public ResponseDto<RegisterResponseDto> register(
-            @UserId Long userId,
-            @RequestParam(value = "nickname", required = false) String nickname,
-            @RequestParam(value = "profileImage", required = false) MultipartFile profileImage) {
-        log.info("회원가입 요청 - 사용자 ID: {}, 닉네임 입력 여부: {}, 프로필 이미지 업로드 여부: {}",
-                userId, nickname != null, profileImage != null && !profileImage.isEmpty());
-
-        RegisterResponseDto response = authService.register(userId, nickname, profileImage);
-        return ResponseDto.ok(response);
     }
 }

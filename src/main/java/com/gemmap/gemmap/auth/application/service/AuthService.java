@@ -565,4 +565,26 @@ public class AuthService {
         // 키 규칙: profiles/{yyyy}/{MM}/{uuid}.{ext}
         return "profiles/" + datePath + "/" + uuid + extension;
     }
+
+    /**
+     * 단순 서비스 로그아웃 처리
+     * 클라이언트에서 토큰을 삭제하도록 하는 단순한 응답
+     */
+    @Transactional
+    public void logout(Long userId) {
+        try {
+            // 사용자 조회
+            User user = userRepository.findById(userId)
+                    .orElseThrow(() -> new CommonException(ErrorCode.USER_NOT_FOUND));
+
+            user.logout();
+            log.info("서비스 로그아웃 - 사용자 ID: {}", userId);
+
+        } catch (CommonException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("로그아웃 처리 중 예상치 못한 오류: {}", e.getMessage(), e);
+            throw new CommonException(ErrorCode.INTERNAL_SERVER_ERROR);
+        }
+    }
 }
