@@ -46,28 +46,6 @@ public class AuthController {
     }
 
     /**
-     * 서비스 토큰 갱신
-     * 서비스 JWT 액세스 토큰 갱신
-     */
-    @PostMapping("/refresh")
-    public ResponseDto<KakaoLoginResponseDto> refreshToken(@UserId Long userId) {
-        log.info("서비스 토큰 갱신 요청 - 사용자 ID: {}", userId);
-        KakaoLoginResponseDto loginResponse = authService.refreshAccessTokenWithUserInfo(userId);
-        return ResponseDto.ok(loginResponse);
-    }
-
-    /**
-     * 서비스 로그아웃
-     * 클라이언트에서 토큰을 삭제하도록 하는 로그아웃
-     */
-    @PostMapping("/logout")
-    public ResponseDto<?> logout(@UserId Long userId) {
-        log.info("서비스 로그아웃 요청 - 사용자 ID: {}", userId);
-        authService.simpleLogout(userId);
-        return ResponseDto.noContent();
-    }
-
-    /**
      * 회원가입 (GUEST → USER 권한 전환)
      * 닉네임과 프로필 이미지를 업데이트하고 권한을 USER로 변경
      */
@@ -81,5 +59,33 @@ public class AuthController {
 
         RegisterResponseDto response = authService.register(userId, nickname, profileImage);
         return ResponseDto.ok(response);
+    }
+
+    /**
+     * 서비스 토큰 갱신
+     * 서비스 JWT 액세스 토큰 갱신
+     */
+    @PostMapping("/refresh")
+    public ResponseDto<KakaoLoginResponseDto> refreshToken(HttpServletRequest request) {
+        log.info("서비스 토큰 갱신 요청");
+
+        // Authorization 헤더에서 서비스 Refresh Token 추출
+        String refreshToken = HeaderUtil.refineHeader(request, Constant.AUTHORIZATION_HEADER, Constant.BEARER_PREFIX)
+                .orElseThrow(() -> new CommonException(ErrorCode.INVALID_TOKEN));
+
+        KakaoLoginResponseDto loginResponse = authService.refreshAccessToken(refreshToken);
+        return ResponseDto.ok(loginResponse);
+    }
+
+    /**
+     * 서비스 로그아웃
+     * 리프레시 토큰을 삭제하도록 하는 로그아웃
+     */
+    @PostMapping("/logout")
+    public ResponseDto<?> logout(@UserId Long userId) {
+        log.info("서비스 로그아웃 요청 - 사용자 ID: {}", userId);
+
+        authService.logout(userId);
+        return ResponseDto.noContent();
     }
 }
