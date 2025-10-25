@@ -66,9 +66,14 @@ public class AuthController {
      * 서비스 JWT 액세스 토큰 갱신
      */
     @PostMapping("/refresh")
-    public ResponseDto<KakaoLoginResponseDto> refreshToken(@UserId Long userId) {
-        log.info("서비스 토큰 갱신 요청 - 사용자 ID: {}", userId);
-        KakaoLoginResponseDto loginResponse = authService.refreshAccessTokenWithUserInfo(userId);
+    public ResponseDto<KakaoLoginResponseDto> refreshToken(HttpServletRequest request) {
+        log.info("서비스 토큰 갱신 요청");
+
+        // Authorization 헤더에서 서비스 Refresh Token 추출
+        String refreshToken = HeaderUtil.refineHeader(request, Constant.AUTHORIZATION_HEADER, Constant.BEARER_PREFIX)
+                .orElseThrow(() -> new CommonException(ErrorCode.INVALID_TOKEN));
+
+        KakaoLoginResponseDto loginResponse = authService.refreshAccessToken(refreshToken);
         return ResponseDto.ok(loginResponse);
     }
 

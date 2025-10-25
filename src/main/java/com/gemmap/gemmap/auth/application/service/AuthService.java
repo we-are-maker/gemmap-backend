@@ -51,6 +51,54 @@ public class AuthService {
     private final S3UrlGenerator s3UrlGenerator;
     private final S3Properties s3Properties;
 
+    /**
+     * 카카오 Access Token으로 인증 (모바일 SDK 방식)
+     * 모바일 앱에서 획득한 카카오 Access Token을 검증하고 서비스 JWT 발급
+     */
+    @Transactional
+    public KakaoLoginResponseDto authenticateWithKakaoAccessToken(String kakaoAccessToken) {
+        if (kakaoAccessToken == null || kakaoAccessToken.trim().isEmpty()) {
+            throw new CommonException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+
+        try {
+            // 1. 카카오 Access Token 검증 (app_id 확인 및 만료 검증)
+            KakaoAccessTokenInfoResponse tokenInfo = kakaoOAuth2Service.getAccessTokenInfo(kakaoAccessToken);
+
+            if (tokenInfo.getId() == null) {
+                throw new CommonException(ErrorCode.EXTERNAL_SERVICE_ERROR);
+            }
+
+            // 2. 카카오 사용자 정보 조회
+            KakaoUserInfoResponse userInfo = kakaoOAuth2Service.getUserInfo(kakaoAccessToken);
+
+            String socialId = tokenInfo.getId().toString();
+            String email = userInfo.getKakaoAccount() != null ? userInfo.getKakaoAccount().getEmail() : null;
+
+            // 3. 사용자 조회 또는 생성
+            User user = findOrCreateKakaoUser(socialId, email, userInfo);
+
+            // 4. 서비스 JWT 토큰 발급
+            JwtTokenDto jwtTokenDto = jwtUtil.generateTokens(user.getId(), user.getRole());
+            user.updateRefreshToken(jwtTokenDto.getRefreshToken());
+            user.updateLoginStatus(true);
+
+            log.info("카카오 SDK 로그인 성공 - 사용자 ID: {}, 권한: {}", user.getId(), user.getRole());
+
+            return KakaoLoginResponseDto.of(
+                    user.getId(),
+                    user.getRole(),
+                    jwtTokenDto.getAccessToken(),
+                    jwtTokenDto.getRefreshToken()
+            );
+        } catch (CommonException e) {
+            // CommonException은 그대로 재던지기
+            throw e;
+        } catch (Exception e) {
+            log.error("카카오 SDK 로그인 처리 중 예상치 못한 오류: {}", e.getMessage(), e);
+            throw new CommonException(ErrorCode.INTERNAL_SERVER_ERROR);
+        }
+    }
 
     /**
      * 카카오 사용자 조회 또는 생성
@@ -197,7 +245,6 @@ public class AuthService {
     private String extractName(KakaoUserInfoResponse userInfo) {
         if (userInfo.getKakaoAccount() != null) {
             String name = userInfo.getKakaoAccount().getName();
-            log.debug("카카오 사용자 이름 추출: {}", name);
             return name;
         }
         log.debug("카카오 계정 정보 없음 - 이름 추출 실패");
@@ -210,7 +257,6 @@ public class AuthService {
     private String extractGender(KakaoUserInfoResponse userInfo) {
         if (userInfo.getKakaoAccount() != null) {
             String gender = userInfo.getKakaoAccount().getGender();
-            log.debug("카카오 사용자 성별 추출: {}", gender);
             return gender;
         }
         log.debug("카카오 계정 정보 없음 - 성별 추출 실패");
@@ -223,7 +269,6 @@ public class AuthService {
     private String extractAgeRange(KakaoUserInfoResponse userInfo) {
         if (userInfo.getKakaoAccount() != null) {
             String ageRange = userInfo.getKakaoAccount().getAgeRange();
-            log.debug("카카오 사용자 연령대 추출: {}", ageRange);
             return ageRange;
         }
         log.debug("카카오 계정 정보 없음 - 연령대 추출 실패");
@@ -236,7 +281,6 @@ public class AuthService {
     private String extractBirthday(KakaoUserInfoResponse userInfo) {
         if (userInfo.getKakaoAccount() != null) {
             String birthday = userInfo.getKakaoAccount().getBirthday();
-            log.debug("카카오 사용자 생일 추출: {}", birthday);
             return birthday;
         }
         log.debug("카카오 계정 정보 없음 - 생일 추출 실패");
@@ -249,200 +293,10 @@ public class AuthService {
     private String extractBirthyear(KakaoUserInfoResponse userInfo) {
         if (userInfo.getKakaoAccount() != null) {
             String birthyear = userInfo.getKakaoAccount().getBirthyear();
-            log.debug("카카오 사용자 출생연도 추출: {}", birthyear);
             return birthyear;
         }
         log.debug("카카오 계정 정보 없음 - 출생연도 추출 실패");
         return null;
-    }
-
-
-    /**
-     * Access Token 갱신 (userId 기반)
-     */
-    @Transactional
-    public JwtTokenDto refreshAccessToken(Long userId) {
-        try {
-            // 사용자 조회 및 로그인 상태 확인
-            User user = userRepository.findById(userId)
-                    .orElseThrow(() -> new CommonException(ErrorCode.USER_NOT_FOUND));
-
-            // 사용자 로그인 상태 확인
-            if (!user.isLogin()) {
-                throw new CommonException(ErrorCode.USER_NOT_LOGGED_IN);
-            }
-
-            // 사용자의 Refresh Token 확인
-            String refreshToken = user.getRefreshToken();
-            if (refreshToken == null || refreshToken.trim().isEmpty()) {
-                throw new CommonException(ErrorCode.INVALID_REFRESH_TOKEN);
-            }
-
-            // Refresh Token 유효성 검증
-            if (!jwtUtil.validateToken(refreshToken)) {
-                throw new CommonException(ErrorCode.INVALID_REFRESH_TOKEN);
-            }
-
-            // Refresh Token 만료 임박 시 새로 발급 (Token Rotation)
-            boolean shouldRotateRefreshToken = jwtUtil.isTokenExpiringSoon(
-                    refreshToken,
-                    (long) (jwtUtil.getRefreshTokenExpiration() * Constant.REFRESH_TOKEN_ROTATION_THRESHOLD)
-            );
-
-            // 새 Access Token 발급
-            String newAccessToken = jwtUtil.generateAccessToken(user.getId(), user.getRole());
-
-            // Refresh Token 갱신 (Token Rotation 적용)
-            String newRefreshToken = refreshToken;
-            if (shouldRotateRefreshToken) {
-                newRefreshToken = jwtUtil.generateRefreshToken(user.getId(), user.getRole());
-                user.updateRefreshToken(newRefreshToken);
-            }
-
-            log.info("토큰 갱신 완료 - 사용자 ID: {}, Refresh Token 갱신: {}",
-                    user.getId(), shouldRotateRefreshToken);
-
-            return JwtTokenDto.builder()
-                    .accessToken(newAccessToken)
-                    .refreshToken(newRefreshToken)
-                    .build();
-
-        } catch (CommonException e) {
-            throw e;
-        } catch (Exception e) {
-            log.error("토큰 갱신 처리 중 예상치 못한 오류: {}", e.getMessage(), e);
-            throw new CommonException(ErrorCode.INTERNAL_SERVER_ERROR);
-        }
-    }
-
-    /**
-     * Access Token 갱신 (KakaoLoginResponseDto 형태로 반환)
-     */
-    @Transactional
-    public KakaoLoginResponseDto refreshAccessTokenWithUserInfo(Long userId) {
-        try {
-            // 사용자 조회 및 로그인 상태 확인
-            User user = userRepository.findById(userId)
-                    .orElseThrow(() -> new CommonException(ErrorCode.USER_NOT_FOUND));
-
-            // 사용자 로그인 상태 확인
-            if (!user.isLogin()) {
-                throw new CommonException(ErrorCode.USER_NOT_LOGGED_IN);
-            }
-
-            // 사용자의 Refresh Token 확인
-            String refreshToken = user.getRefreshToken();
-            if (refreshToken == null || refreshToken.trim().isEmpty()) {
-                throw new CommonException(ErrorCode.INVALID_REFRESH_TOKEN);
-            }
-
-            // Refresh Token 유효성 검증
-            if (!jwtUtil.validateToken(refreshToken)) {
-                throw new CommonException(ErrorCode.INVALID_REFRESH_TOKEN);
-            }
-
-            // Refresh Token 만료 임박 시 새로 발급 (Token Rotation)
-            boolean shouldRotateRefreshToken = jwtUtil.isTokenExpiringSoon(
-                    refreshToken,
-                    (long) (jwtUtil.getRefreshTokenExpiration() * Constant.REFRESH_TOKEN_ROTATION_THRESHOLD)
-            );
-
-            // 새 Access Token 발급
-            String newAccessToken = jwtUtil.generateAccessToken(user.getId(), user.getRole());
-
-            // Refresh Token 갱신 (Token Rotation 적용)
-            String newRefreshToken = refreshToken;
-            if (shouldRotateRefreshToken) {
-                newRefreshToken = jwtUtil.generateRefreshToken(user.getId(), user.getRole());
-                user.updateRefreshToken(newRefreshToken);
-            }
-
-            log.info("토큰 갱신 완료 - 사용자 ID: {}, Refresh Token 갱신: {}",
-                    user.getId(), shouldRotateRefreshToken);
-
-            return KakaoLoginResponseDto.of(
-                    user.getId(),
-                    user.getRole(),
-                    newAccessToken,
-                    newRefreshToken
-            );
-
-        } catch (CommonException e) {
-            throw e;
-        } catch (Exception e) {
-            log.error("토큰 갱신 처리 중 예상치 못한 오류: {}", e.getMessage(), e);
-            throw new CommonException(ErrorCode.INTERNAL_SERVER_ERROR);
-        }
-    }
-
-    /**
-     * 단순 서비스 로그아웃 처리
-     * 클라이언트에서 토큰을 삭제하도록 하는 단순한 응답
-     */
-    public void simpleLogout(Long userId) {
-        try {
-            // 사용자 존재 확인 (보안상 필요)
-            User user = userRepository.findById(userId)
-                    .orElseThrow(() -> new CommonException(ErrorCode.USER_NOT_FOUND));
-
-            log.info("서비스 로그아웃 - 사용자 ID: {}", userId);
-            // 실제로는 클라이언트에서 토큰을 삭제하도록 204 응답만 전송
-
-        } catch (CommonException e) {
-            throw e;
-        } catch (Exception e) {
-            log.error("로그아웃 처리 중 예상치 못한 오류: {}", e.getMessage(), e);
-            throw new CommonException(ErrorCode.INTERNAL_SERVER_ERROR);
-        }
-    }
-
-    /**
-     * 카카오 Access Token으로 인증 (모바일 SDK 방식 - B안)
-     * 모바일 앱에서 획득한 카카오 Access Token을 검증하고 서비스 JWT 발급
-     */
-    @Transactional
-    public KakaoLoginResponseDto authenticateWithKakaoAccessToken(String kakaoAccessToken) {
-        if (kakaoAccessToken == null || kakaoAccessToken.trim().isEmpty()) {
-            throw new CommonException(ErrorCode.INVALID_INPUT_VALUE);
-        }
-
-        try {
-            // 1. 카카오 Access Token 검증 (app_id 확인 및 만료 검증)
-            KakaoAccessTokenInfoResponse tokenInfo = kakaoOAuth2Service.getAccessTokenInfo(kakaoAccessToken);
-
-            if (tokenInfo.getId() == null) {
-                throw new CommonException(ErrorCode.EXTERNAL_SERVICE_ERROR);
-            }
-
-            // 2. 카카오 사용자 정보 조회
-            KakaoUserInfoResponse userInfo = kakaoOAuth2Service.getUserInfo(kakaoAccessToken);
-
-            String socialId = tokenInfo.getId().toString();
-            String email = userInfo.getKakaoAccount() != null ? userInfo.getKakaoAccount().getEmail() : null;
-
-            // 3. 사용자 조회 또는 생성
-            User user = findOrCreateKakaoUser(socialId, email, userInfo);
-
-            // 4. 서비스 JWT 토큰 발급
-            JwtTokenDto jwtTokenDto = jwtUtil.generateTokens(user.getId(), user.getRole());
-            user.updateRefreshToken(jwtTokenDto.getRefreshToken());
-            user.updateLoginStatus(true);
-
-            log.info("카카오 SDK 로그인 성공 - 사용자 ID: {}, 권한: {}", user.getId(), user.getRole());
-
-            return KakaoLoginResponseDto.of(
-                    user.getId(),
-                    user.getRole(),
-                    jwtTokenDto.getAccessToken(),
-                    jwtTokenDto.getRefreshToken()
-            );
-        } catch (CommonException e) {
-            // CommonException은 그대로 재던지기
-            throw e;
-        } catch (Exception e) {
-            log.error("카카오 SDK 로그인 처리 중 예상치 못한 오류: {}", e.getMessage(), e);
-            throw new CommonException(ErrorCode.INTERNAL_SERVER_ERROR);
-        }
     }
 
     /**
@@ -566,6 +420,60 @@ public class AuthService {
 
         // 키 규칙: profiles/{yyyy}/{MM}/{uuid}.{ext}
         return "profiles/" + datePath + "/" + uuid + extension;
+    }
+
+    /**
+     * 액세스 토큰 갱신
+     */
+    @Transactional
+    public KakaoLoginResponseDto refreshAccessToken(String refreshToken) {
+        try {
+            // Refresh Token 유효성 검증
+            if (!jwtUtil.validateToken(refreshToken)) {
+                throw new CommonException(ErrorCode.INVALID_REFRESH_TOKEN);
+            }
+
+            // 사용자 조회
+            User user = userRepository.findByRefreshToken(refreshToken)
+                    .orElseThrow(() -> new CommonException(ErrorCode.INVALID_REFRESH_TOKEN));
+
+            // 사용자 로그인 상태 확인
+            if (!user.isLogin()) {
+                throw new CommonException(ErrorCode.USER_NOT_LOGGED_IN);
+            }
+
+            // Refresh Token 만료 임박 시 새로 발급 (Token Rotation)
+            boolean shouldRotateRefreshToken = jwtUtil.isTokenExpiringSoon(
+                    refreshToken,
+                    (long) (jwtUtil.getRefreshTokenExpiration() * Constant.REFRESH_TOKEN_ROTATION_THRESHOLD)
+            );
+
+            // 새 Access Token 발급
+            String newAccessToken = jwtUtil.generateAccessToken(user.getId(), user.getRole());
+
+            // Refresh Token 갱신 (Token Rotation 적용)
+            String newRefreshToken = refreshToken;
+            if (shouldRotateRefreshToken) {
+                newRefreshToken = jwtUtil.generateRefreshToken(user.getId(), user.getRole());
+                user.updateRefreshToken(newRefreshToken);
+            }
+
+            log.info("토큰 갱신 완료 - 사용자 ID: {}, Refresh Token 갱신: {}",
+                    user.getId(), shouldRotateRefreshToken);
+
+            return KakaoLoginResponseDto.of(
+                    user.getId(),
+                    user.getRole(),
+                    newAccessToken,
+                    newRefreshToken
+            );
+
+        } catch (CommonException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("토큰 갱신 처리 중 예상치 못한 오류: {}", e.getMessage(), e);
+            throw new CommonException(ErrorCode.INTERNAL_SERVER_ERROR);
+        }
     }
 
     /**
