@@ -55,6 +55,7 @@ public enum ErrorCode {
     IMAGE_UPLOAD_FAILED(50010, HttpStatus.INTERNAL_SERVER_ERROR, "이미지 업로드에 실패했습니다."),
     S3_OPERATION_FAILED(50011, HttpStatus.INTERNAL_SERVER_ERROR, "Object Storage 작업 중 오류가 발생했습니다."),
     IMAGE_DELETE_FAILED(50012, HttpStatus.INTERNAL_SERVER_ERROR, "이미지 삭제에 실패했습니다."),
+    FILE_UPLOAD_FAILED(50020, HttpStatus.INTERNAL_SERVER_ERROR, "파일 업로드에 실패했습니다."),
     INVALID_FILE_FORMAT(40010, HttpStatus.BAD_REQUEST, "지원하지 않는 파일 형식입니다."),
     FILE_SIZE_EXCEEDED(40011, HttpStatus.BAD_REQUEST, "파일 크기가 너무 큽니다."),
 

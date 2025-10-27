@@ -39,7 +39,8 @@ public class Constant {
 
     // 인증된 일반 사용자가 접근 가능한 경로
     public static final String[] USER_URLS = {
-            "/api/v1/users/**"
+            "/api/v1/users/**",
+            "/api/v1/spots/**"
     };
 
     // 관리자만 접근 가능한 경로
