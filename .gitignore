@@ -67,5 +67,9 @@ src/main/resources/certs
 
 nul
 
+<<<<<<< Updated upstream
 # docs
+=======
+# Document
+>>>>>>> Stashed changes
 docs

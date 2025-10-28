@@ -41,4 +41,13 @@ public class SpotController {
         );
         return ResponseDto.created(spotService.create(userId, request, file));
     }
+
+    @DeleteMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseDto<?> delete(
+            @UserId Long userId,
+            @RequestParam(value = "spotId") Long spotId
+    ) {
+        spotService.delete(userId, spotId);
+        return ResponseDto.noContent();
+    }
 }
