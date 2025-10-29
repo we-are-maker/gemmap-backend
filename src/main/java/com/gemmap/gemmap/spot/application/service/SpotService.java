@@ -46,6 +46,14 @@ public class SpotService {
     private final S3Properties s3Properties;
     private final SpotFileValidator spotFileValidator;
 
+    /**
+     * 스팟 생성
+     *
+     * @param userId 요청 사용자 ID
+     * @param req 스팟 생성 요청 DTO
+     * @param file 업로드할 이미지 파일
+     * @return SpotCreateResponse
+     */
     @Transactional
     public SpotCreateResponse create(Long userId, SpotCreateRequest req, MultipartFile file) {
         // 1) 사용자 조회
