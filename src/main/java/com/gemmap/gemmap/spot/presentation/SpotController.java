@@ -3,6 +3,7 @@ package com.gemmap.gemmap.spot.presentation;
 import com.gemmap.gemmap.shared.common.annotation.UserId;
 import com.gemmap.gemmap.shared.common.dto.ResponseDto;
 import com.gemmap.gemmap.spot.application.dto.request.SpotCreateRequest;
+import com.gemmap.gemmap.spot.application.dto.response.MySpotsResponse;
 import com.gemmap.gemmap.spot.application.dto.response.SpotCreateResponse;
 import com.gemmap.gemmap.spot.application.dto.response.SpotDetailResponse;
 import com.gemmap.gemmap.spot.application.service.SpotService;
@@ -90,5 +91,18 @@ public class SpotController {
             @PathVariable Long spotId
     ) {
         return ResponseDto.ok(spotService.getSpotDetail(userId, spotId));
+    }
+
+    /**
+     * 내가 제보한 스팟 목록 조회
+     *
+     * @param userId 인증된 사용자 ID
+     * @return 내가 제보한 스팟 목록 (프로필 정보 + 스팟 목록)
+     */
+    @GetMapping("/me")
+    public ResponseDto<MySpotsResponse> getMySpots(
+            @UserId Long userId
+    ) {
+        return ResponseDto.ok(spotService.getMySpots(userId));
     }
 }

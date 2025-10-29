@@ -1,5 +1,6 @@
 package com.gemmap.gemmap.spot.domain.entity;
 
+import com.gemmap.gemmap.auth.domain.entity.User;
 import com.gemmap.gemmap.shared.common.enums.ESpotPhotoType;
 import jakarta.persistence.*;
 import lombok.*;
@@ -23,6 +24,10 @@ public class SpotPhoto {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "spot_id", nullable = false)
     private Spot spot; // 스팟 id
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", nullable = false)
+    private User user; // 사진 등록자 (사용자 id)
 
     @Column(name = "file_url", nullable = false, length = 500)
     private String fileUrl; // 오브젝트 스토리지 URL
