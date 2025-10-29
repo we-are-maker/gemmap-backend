@@ -4,11 +4,13 @@ import com.gemmap.gemmap.auth.domain.entity.User;
 import com.gemmap.gemmap.auth.domain.repository.UserRepository;
 import com.gemmap.gemmap.image.infrastructure.objectstorage.ObjectStorageService;
 import com.gemmap.gemmap.image.infrastructure.objectstorage.S3UrlGenerator;
+import com.gemmap.gemmap.shared.common.enums.ESpotPhotoType;
 import com.gemmap.gemmap.shared.config.s3.S3Properties;
 import com.gemmap.gemmap.shared.exception.CommonException;
 import com.gemmap.gemmap.shared.exception.ErrorCode;
 import com.gemmap.gemmap.spot.application.dto.request.SpotCreateRequest;
 import com.gemmap.gemmap.spot.application.dto.response.SpotCreateResponse;
+import com.gemmap.gemmap.spot.application.dto.response.SpotDetailResponse;
 import com.gemmap.gemmap.spot.application.support.SpotFileValidator;
 import com.gemmap.gemmap.spot.domain.entity.Spot;
 import com.gemmap.gemmap.spot.domain.entity.SpotPhoto;
@@ -81,7 +83,7 @@ public class SpotService {
             SpotPhoto photo = SpotPhoto.builder()
                 .spot(spot)
                 .fileUrl(fileUrl)
-                .type(SpotPhoto.Type.SPOT)
+                .type(ESpotPhotoType.SPOT)
                 .takenAt(parseUtc(req.takenAt()))
                 .latitude(req.latitude())
                 .longitude(req.longitude())
@@ -158,7 +160,7 @@ public class SpotService {
 
         // 2) Spot 존재 확인
         Spot spot = spotRepository.findById(spotId)
-            .orElseThrow(() -> new CommonException(ErrorCode.RESOURCE_NOT_FOUND, "스팟을 찾을 수 없습니다."));
+            .orElseThrow(() -> new CommonException(ErrorCode.SPOT_NOT_FOUND));
 
         // 3) 소유권 검증
         if (!spot.getUserId().equals(userId)) {
@@ -193,5 +195,35 @@ public class SpotService {
             // 스토리지 삭제 실패는 로그만 남기고 계속 진행 (비용 이슈지만 참조 깨짐 없음)
             log.error("Failed to delete S3 object (best-effort). URL: {}", fileUrl, e);
         }
+    }
+
+    /**
+     * 스팟 상세 조회
+     *
+     * @param userId 요청 사용자 ID (인증용, 현재는 조회만 수행)
+     * @param spotId 조회할 스팟 ID
+     * @return SpotDetailResponse
+     */
+    @Transactional(readOnly = true)
+    public SpotDetailResponse getSpotDetail(Long userId, Long spotId) {
+        // 1) 사용자 조회 (인증 확인)
+        userRepository.findById(userId)
+                .orElseThrow(() -> new CommonException(ErrorCode.USER_NOT_FOUND));
+
+        // 2) Spot 조회
+        Spot spot = spotRepository.findById(spotId)
+                .orElseThrow(() -> new CommonException(ErrorCode.SPOT_NOT_FOUND));
+
+        // 3) Spot 작성자(소유자) 조회
+        User spotOwner = userRepository.findById(spot.getUserId())
+                .orElseThrow(() -> new CommonException(ErrorCode.USER_NOT_FOUND, "스팟 등록자를 찾을 수 없습니다."));
+
+        // 4) 대표 사진 조회 (최신 1건)
+        SpotPhoto representativePhoto = spotPhotoRepository.
+                findFirstBySpotAndTypeOrderByCreatedAtDesc(spot, ESpotPhotoType.SPOT)
+                .orElseThrow(() -> new CommonException(ErrorCode.SPOT_PHOTO_NOT_FOUND, "스팟 사진이 존재하지 않습니다."));
+
+        // 5) 응답 DTO 변환
+        return SpotDetailResponse.from(spot, spotOwner, representativePhoto);
     }
 }

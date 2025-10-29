@@ -4,6 +4,7 @@ import com.gemmap.gemmap.shared.common.annotation.UserId;
 import com.gemmap.gemmap.shared.common.dto.ResponseDto;
 import com.gemmap.gemmap.spot.application.dto.request.SpotCreateRequest;
 import com.gemmap.gemmap.spot.application.dto.response.SpotCreateResponse;
+import com.gemmap.gemmap.spot.application.dto.response.SpotDetailResponse;
 import com.gemmap.gemmap.spot.application.service.SpotService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
@@ -49,5 +50,20 @@ public class SpotController {
     ) {
         spotService.delete(userId, spotId);
         return ResponseDto.noContent();
+    }
+
+    /**
+     * 스팟 상세 조회
+     *
+     * @param userId 인증된 사용자 ID
+     * @param spotId 조회할 스팟 ID
+     * @return 스팟 상세 정보
+     */
+    @GetMapping("/{spotId}")
+    public ResponseDto<SpotDetailResponse> getSpotDetail(
+            @UserId Long userId,
+            @PathVariable Long spotId
+    ) {
+        return ResponseDto.ok(spotService.getSpotDetail(userId, spotId));
     }
 }

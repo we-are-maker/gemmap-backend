@@ -1,5 +1,6 @@
 package com.gemmap.gemmap.spot.domain.entity;
 
+import com.gemmap.gemmap.shared.common.enums.ESpotPhotoType;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
@@ -26,11 +27,9 @@ public class SpotPhoto {
     @Column(name = "file_url", nullable = false, length = 500)
     private String fileUrl; // 오브젝트 스토리지 URL
 
-    public enum Type { SPOT, CHECKIN }
-
+    @Column(name = "type", nullable = false)
     @Enumerated(EnumType.STRING)
-    @Column(name = "type", nullable = false, columnDefinition = "enum('SPOT','CHECKIN') default 'SPOT'")
-    private Type type; // 업로드 목적
+    private ESpotPhotoType type; // 업로드 목적
 
     @Column(name = "taken_at")
     private LocalDateTime takenAt; // 촬영 시각 (UTC 저장)
