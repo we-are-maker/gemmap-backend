@@ -2,6 +2,7 @@ package com.gemmap.gemmap.spot.presentation;
 
 import com.gemmap.gemmap.auth.infrastructure.jwt.JwtUtil;
 import com.gemmap.gemmap.shared.common.enums.ERole;
+import com.gemmap.gemmap.shared.common.enums.ESpotPhotoType;
 import com.gemmap.gemmap.spot.domain.entity.Spot;
 import com.gemmap.gemmap.spot.domain.entity.SpotPhoto;
 import com.gemmap.gemmap.spot.domain.repository.SpotPhotoRepository;
@@ -96,7 +97,7 @@ class SpotControllerIT {
 
         List<SpotPhoto> photos = spotPhotoRepository.findAll();
         assertThat(photos).hasSize(1);
-        assertThat(photos.get(0).getType()).isEqualTo(SpotPhoto.Type.SPOT);
+        assertThat(photos.get(0).getType()).isEqualTo(ESpotPhotoType.SPOT);
         assertThat(photos.get(0).getFileUrl()).contains("spots/");
     }
 

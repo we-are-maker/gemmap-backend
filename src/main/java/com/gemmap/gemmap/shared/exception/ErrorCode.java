@@ -38,6 +38,8 @@ public enum ErrorCode {
     // 404 Not Found
     RESOURCE_NOT_FOUND(40400, HttpStatus.NOT_FOUND, "요청한 리소스를 찾을 수 없습니다."),
     USER_NOT_FOUND(40401, HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다."),
+    SPOT_NOT_FOUND(40402, HttpStatus.NOT_FOUND, "스팟을 찾을 수 없습니다."),
+    SPOT_PHOTO_NOT_FOUND(40403, HttpStatus.NOT_FOUND, "스팟 사진을 찾을 수 없습니다."),
 
     // 409 Conflict
     CONFLICT(40900, HttpStatus.CONFLICT, "요청이 현재 리소스 상태와 충돌합니다."),
