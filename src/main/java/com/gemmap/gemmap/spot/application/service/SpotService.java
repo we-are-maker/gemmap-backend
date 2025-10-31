@@ -9,10 +9,7 @@ import com.gemmap.gemmap.shared.config.s3.S3Properties;
 import com.gemmap.gemmap.shared.exception.CommonException;
 import com.gemmap.gemmap.shared.exception.ErrorCode;
 import com.gemmap.gemmap.spot.application.dto.request.SpotCreateRequest;
-import com.gemmap.gemmap.spot.application.dto.response.MySpotsResponse;
-import com.gemmap.gemmap.spot.application.dto.response.SpotCreateResponse;
-import com.gemmap.gemmap.spot.application.dto.response.SpotDetailResponse;
-import com.gemmap.gemmap.spot.application.dto.response.SpotSummary;
+import com.gemmap.gemmap.spot.application.dto.response.*;
 import com.gemmap.gemmap.spot.application.support.SpotFileValidator;
 import com.gemmap.gemmap.spot.domain.entity.Spot;
 import com.gemmap.gemmap.spot.domain.entity.SpotPhoto;
@@ -275,5 +272,25 @@ public class SpotService {
 
         // 5) 응답 DTO 변환
         return MySpotsResponse.of(user, totalCount, spotSummaries);
+    }
+
+    /**
+     * 지도 전체 마커 조회
+     *
+     * @param userId 인증된 사용자 ID
+     * @return SpotsResponse
+     */
+    @Transactional(readOnly = true)
+    public SpotsResponse getSpots(Long userId) {
+        // 1) 사용자 조회 (인증 확인)
+        userRepository.findById(userId)
+                .orElseThrow(() -> new CommonException(ErrorCode.USER_NOT_FOUND));
+
+        // 2) 전체 스팟과 최신 사진 위치 정보를 한 번의 쿼리로 조회 (N+1 문제 해결)
+        //    JOIN 쿼리를 사용하여 각 스팟의 가장 최근 SPOT 타입 사진의 위도/경도 정보를 함께 조회
+        List<SpotMakerInfo> spotMakers = spotRepository.findAllSpotsWithLatestPhotoLocation(ESpotPhotoType.SPOT);
+
+        // 3) 응답 DTO 반환 - spotId(spots), latitude(spot_photos), longitude(spot_photos)
+        return SpotsResponse.of(spotMakers);
     }
 }
