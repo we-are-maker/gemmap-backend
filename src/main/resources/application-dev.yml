@@ -23,6 +23,9 @@ spring:
         jdbc.batch_size: 20
         default_batch_fetch_size: ${chunkSize:100}
 
+server:
+  forward-headers-strategy: framework
+
 logging:
   level:
     com.gemmap.gemmap: INFO
