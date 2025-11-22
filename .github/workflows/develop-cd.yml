@@ -1,0 +1,122 @@
+name: CD - Deploy to Oracle Dev
+
+on:
+  workflow_run:
+    workflows: ["CI - Build & Push Docker"]
+    types: [completed]
+
+jobs:
+  deploy-dev:
+    name: Deploy to Oracle Dev
+    runs-on: ubuntu-latest
+
+    # CI 성공 + develop 브랜치일 때만 배포
+    if: >
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_branch == 'develop'
+
+    steps:
+      # 1. 워크플로우 디버깅용
+      - name: Print workflow_run info
+        run: |
+          echo "workflow:  ${{ github.event.workflow_run.name }}"
+          echo "branch:    ${{ github.event.workflow_run.head_branch }}"
+          echo "conclusion:${{ github.event.workflow_run.conclusion }}"
+
+      # 2. Dev 서버에서 Docker Hub 로그인
+      - name: Docker login on Dev server
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          key: ${{ secrets.PRIVATE_KEY }}
+          port: 22
+          script: |
+            set -eux
+            sudo docker login -u ${{ secrets.DOCKER_USERNAME }} -p ${{ secrets.DOCKER_PASSWORD }}
+
+      # 3. 기존 컨테이너 중지 & 제거
+      - name: Stop & remove existing gemmap-api container
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          key: ${{ secrets.PRIVATE_KEY }}
+          port: 22
+          script: |
+            set -eux
+            sudo docker stop gemmap-api || true
+            sudo docker rm -f gemmap-api || true
+
+      # 4. 최신 이미지 Pull
+      - name: Pull latest dev image
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          key: ${{ secrets.PRIVATE_KEY }}
+          port: 22
+          script: |
+            set -eux
+            REPO=${{ secrets.DOCKER_REPOSITORY }}
+            TAG=dev-latest
+
+            sudo docker pull $REPO:$TAG
+
+      # 5. 새로운 컨테이너 실행 (--net=host)
+      - name: Run new gemmap-api container
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          key: ${{ secrets.PRIVATE_KEY }}
+          port: 22
+          script: |
+            set -eux
+
+            REPO=${{ secrets.DOCKER_REPOSITORY }}
+            TAG=dev-latest
+
+            sudo docker run -d \
+              --name gemmap-api \
+              --net=host \
+              -e TZ=Asia/Seoul \
+              -e SPRING_PROFILES_ACTIVE=dev \
+              \
+              -e DB_HOST='${{ secrets.DB_HOST }}' \
+              -e DB_PORT='${{ secrets.DB_PORT }}' \
+              -e DB_NAME='${{ secrets.DB_NAME }}' \
+              -e DB_USERNAME='${{ secrets.DB_USERNAME }}' \
+              -e DB_PASSWORD='${{ secrets.DB_PASSWORD }}' \
+              \
+              -e JWT_SECRET_KEY='${{ secrets.JWT_SECRET_KEY }}' \
+              -e JWT_ACCESS_TOKEN_EXPIRATION='${{ secrets.JWT_ACCESS_TOKEN_EXPIRATION }}' \
+              -e JWT_REFRESH_TOKEN_EXPIRATION='${{ secrets.JWT_REFRESH_TOKEN_EXPIRATION }}' \
+              \
+              -e KAKAO_CLIENT_ID='${{ secrets.KAKAO_CLIENT_ID }}' \
+              -e KAKAO_CLIENT_SECRET='${{ secrets.KAKAO_CLIENT_SECRET }}' \
+              -e KAKAO_REDIRECT_URI='${{ secrets.KAKAO_REDIRECT_URI }}' \
+              -e KAKAO_APP_ID='${{ secrets.KAKAO_APP_ID }}' \
+              \
+              -e S3_ENDPOINT='${{ secrets.S3_ENDPOINT }}' \
+              -e S3_REGION='${{ secrets.S3_REGION }}' \
+              -e S3_BUCKET='${{ secrets.S3_BUCKET }}' \
+              -e S3_ACCESS_KEY='${{ secrets.S3_ACCESS_KEY }}' \
+              -e S3_SECRET_KEY='${{ secrets.S3_SECRET_KEY }}' \
+              -e S3_BASE_PATH='${{ secrets.S3_BASE_PATH }}' \
+              \
+              -e CORS_ALLOWED_ORIGINS='${{ secrets.CORS_ALLOWED_ORIGINS }}' \
+              -e CORS_MAX_AGE='${{ secrets.CORS_MAX_AGE }}' \
+              $REPO:$TAG
+
+      # 6. 오래된 이미지 정리
+      - name: Prune old Docker images
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          key: ${{ secrets.PRIVATE_KEY }}
+          port: 22
+          script: |
+            set -eux
+            sudo docker image prune -f
