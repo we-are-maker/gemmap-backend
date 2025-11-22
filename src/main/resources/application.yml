@@ -37,13 +37,12 @@ oauth2:
     redirect-uri: ${KAKAO_REDIRECT_URI}
     app-id: ${KAKAO_APP_ID}
 
-# NHN Cloud Object Storage 설정
+# OCI Object Storage 설정 (S3 호환)
 s3:
   credentials:
     access-key: ${S3_ACCESS_KEY}
     secret-key: ${S3_SECRET_KEY}
   endpoint: ${S3_ENDPOINT}
-  tenant-id: ${S3_TENANT_ID}
   region:
     name: ${S3_REGION}
   bucket: ${S3_BUCKET}
