@@ -6,6 +6,7 @@ import com.gemmap.gemmap.spot.application.dto.request.SpotCreateRequest;
 import com.gemmap.gemmap.spot.application.dto.response.MySpotsResponse;
 import com.gemmap.gemmap.spot.application.dto.response.SpotCreateResponse;
 import com.gemmap.gemmap.spot.application.dto.response.SpotDetailResponse;
+import com.gemmap.gemmap.spot.application.dto.response.SpotsResponse;
 import com.gemmap.gemmap.spot.application.service.SpotService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
@@ -104,5 +105,17 @@ public class SpotController {
             @UserId Long userId
     ) {
         return ResponseDto.ok(spotService.getMySpots(userId));
+    }
+
+    /**
+     * 지도 전체 마커 조회
+     *
+     * @param userId 인증된 사용자 ID
+     */
+    @GetMapping("/markers")
+    public ResponseDto<SpotsResponse> getSpots(
+            @UserId Long userId
+    ) {
+        return ResponseDto.ok(spotService.getSpots(userId));
     }
 }
