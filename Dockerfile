@@ -15,6 +15,6 @@ RUN ./gradlew clean build -x test --no-daemon
 
 EXPOSE 8080
 
-ENV SPRING_PROFILES_ACTIVE=dev
+ENV JAVA_OPTS=""
 
-CMD ["java", "-jar", "build/libs/gemmap-0.0.1-SNAPSHOT.jar"]
+CMD ["sh", "-c", "java $JAVA_OPTS -jar build/libs/gemmap-0.0.1-SNAPSHOT.jar"]

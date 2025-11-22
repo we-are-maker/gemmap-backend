@@ -1,7 +1,7 @@
 spring:
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://${DB_HOST}:${DB_PORT}/${DB_NAME}?sslMode=VERIFY_IDENTITY&serverTimezone=Asia/Seoul&enabledTLSProtocols=TLSv1.2,TLSv1.3
+    url: jdbc:mysql://${DB_HOST}:${DB_PORT}/${DB_NAME}?useSSL=false&serverTimezone=Asia/Seoul&characterEncoding=UTF-8
     username: ${DB_USERNAME}
     password: ${DB_PASSWORD}
     hikari:
@@ -23,10 +23,17 @@ spring:
         jdbc.batch_size: 20
         default_batch_fetch_size: ${chunkSize:100}
 
+server:
+  forward-headers-strategy: framework
+
 logging:
   level:
     com.gemmap.gemmap: INFO
     org.springframework.security: WARN
+
+# OCI Object Storage 설정 (S3 호환)
+s3:
+  base-path: dev/spots/
 
 # Dev 환경 설정
 cors:

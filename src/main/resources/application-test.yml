@@ -32,14 +32,13 @@ oauth2:
     redirect-uri: "http://localhost:8080/api/v1/auth/kakao/callback"
     app-id: 1234567890
 
-# S3 설정 (테스트용)
+# S3 설정 (테스트용 - OCI S3 호환 모드)
 s3:
   credentials:
     access-key: "test-access-key"
     secret-key: "test-secret-key"
   endpoint: "http://localhost:9000"
   storage-url: "http://localhost:9000"
-  tenant-id: "test-tenant-id"
   region:
     name: "kr-1"
   bucket: "test-bucket"

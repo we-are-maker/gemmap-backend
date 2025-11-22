@@ -17,6 +17,7 @@ import com.gemmap.gemmap.spot.domain.repository.SpotPhotoRepository;
 import com.gemmap.gemmap.spot.domain.repository.SpotRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -46,6 +47,9 @@ public class SpotService {
     private final S3Properties s3Properties;
     private final SpotFileValidator spotFileValidator;
 
+    @Value("${s3.base-path}")
+    private String basePath;
+
     /**
      * 스팟 생성
      *
@@ -64,7 +68,7 @@ public class SpotService {
         validateCoordinates(req.latitude(), req.longitude());
         spotFileValidator.validateImage(file);
 
-        // 3) 업로드 (키 규칙: spots/yyyy/MM/uuid.ext)
+        // 3) 업로드 (키 규칙 예: spots/yyyy/MM/uuid.ext)
         String key = buildSpotKey(file.getOriginalFilename());
         String fileUrl;
         try {
@@ -143,7 +147,7 @@ public class SpotService {
             .map(n -> n.substring(n.lastIndexOf('.')))
             .orElse(".jpg");
         String ym = DateTimeFormatter.ofPattern("yyyy/MM").format(LocalDate.now(ZoneOffset.UTC));
-        return "spots/" + ym + "/" + UUID.randomUUID() + ext;
+        return basePath + ym + "/" + UUID.randomUUID() + ext;
     }
 
     private void safeDeleteObject(String key) {

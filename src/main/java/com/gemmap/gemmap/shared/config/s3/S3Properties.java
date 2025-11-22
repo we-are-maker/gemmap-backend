@@ -19,8 +19,6 @@ public class S3Properties {
     @NotEmpty
     private String endpoint;
     @NotEmpty
-    private String tenantId;
-    @NotEmpty
     private String bucket;
     private String basePath;
     private boolean pathStyleAccessEnabled = true;
