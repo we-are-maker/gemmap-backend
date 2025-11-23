@@ -18,7 +18,7 @@ public record SpotDetailResponse(
         String alias,           // 스팟 별칭
         String fileUrl,         // 사진 URL
         String address,         // 도로명주소
-        String takenAt,         // 촬영시각(UTC, ISO-8601 Z)
+        String takenAt,         // 촬영시각(KST, ISO-8601)
         BigDecimal latitude,    // 위도
         BigDecimal longitude,   // 경도
         String cameraMake,      // 카메라 브랜드
@@ -27,7 +27,7 @@ public record SpotDetailResponse(
         String shutterSpeed,    // 셔터속도
         Integer iso,            // ISO
         BigDecimal focalLength, // 초점거리
-        String createdAt        // 생성시각(스팟, UTC, ISO-8601 Z)
+        String createdAt        // 생성시각(스팟, KST, ISO-8601)
 ) {
 
     public static SpotDetailResponse from (Spot spot, User spotOwner, SpotPhoto photo) {
@@ -38,7 +38,7 @@ public record SpotDetailResponse(
                 .alias(spot.getAlias())
                 .fileUrl(photo.getFileUrl())
                 .address(spot.getAddress())
-                .takenAt(toUtcIso(photo.getTakenAt())) // LocalDateTime/Instant/OffsetDateTime 대응
+                .takenAt(toKstIso(photo.getTakenAt())) // LocalDateTime/Instant/OffsetDateTime 대응
                 .latitude(photo.getLatitude())
                 .longitude(photo.getLongitude())
                 .cameraMake(photo.getCameraMake())
@@ -47,28 +47,28 @@ public record SpotDetailResponse(
                 .shutterSpeed(photo.getShutterSpeed())
                 .iso(photo.getIso())
                 .focalLength(photo.getFocalLength())
-                .createdAt(toUtcIso(spot.getCreatedAt()))
+                .createdAt(toKstIso(spot.getCreatedAt()))
                 .build();
     }
 
-    // 시간 포맷터 (UTC ISO_INSTANT)
-    private static String toUtcIso(Object temporal) {
+    // 시간 포맷터 (KST 기준)
+    private static String toKstIso(Object temporal) {
         if (temporal == null) return null;
-        Instant instant;
+        LocalDateTime localDateTime;
 
         if (temporal instanceof Instant i) {
-            instant = i;
+            localDateTime = LocalDateTime.ofInstant(i, ZoneId.of("Asia/Seoul"));
         } else if (temporal instanceof LocalDateTime ldt) {
-            instant = ldt.atZone(ZoneId.systemDefault()).toInstant();
+            localDateTime = ldt;
         } else if (temporal instanceof OffsetDateTime odt) {
-            instant = odt.toInstant();
+            localDateTime = odt.atZoneSameInstant(ZoneId.of("Asia/Seoul")).toLocalDateTime();
         } else if (temporal instanceof ZonedDateTime zdt) {
-            instant = zdt.toInstant();
+            localDateTime = zdt.withZoneSameInstant(ZoneId.of("Asia/Seoul")).toLocalDateTime();
         } else {
             throw new IllegalArgumentException("Unsupported temporal type: " + temporal.getClass());
         }
 
-        instant = instant.truncatedTo(ChronoUnit.SECONDS);
-        return DateTimeFormatter.ISO_INSTANT.format(instant); // ex) 2025-10-23T11:22:33Z
+        localDateTime = localDateTime.truncatedTo(ChronoUnit.SECONDS);
+        return DateTimeFormatter.ISO_LOCAL_DATE_TIME.format(localDateTime); // ex) 2025-10-27T21:34:56
     }
 }

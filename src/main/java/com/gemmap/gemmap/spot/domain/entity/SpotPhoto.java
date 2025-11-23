@@ -37,7 +37,7 @@ public class SpotPhoto {
     private ESpotPhotoType type; // 업로드 목적
 
     @Column(name = "taken_at")
-    private LocalDateTime takenAt; // 촬영 시각 (UTC 저장)
+    private LocalDateTime takenAt; // 촬영 시각 (KST 저장)
 
     @Column(precision = 10, scale = 8, nullable = false)
     private BigDecimal latitude; // 위도

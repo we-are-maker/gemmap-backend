@@ -135,7 +135,8 @@ public class SpotService {
     private static LocalDateTime parseUtc(String isoZ) {
         if (isoZ == null || isoZ.isBlank()) return null;
         try {
-            return LocalDateTime.ofInstant(Instant.parse(isoZ), ZoneOffset.UTC);
+            // UTC ISO8601 입력을 파싱하여 KST 시간으로 변환하여 저장
+            return LocalDateTime.ofInstant(Instant.parse(isoZ), java.time.ZoneId.of("Asia/Seoul"));
         } catch (DateTimeParseException e) {
             throw new CommonException(ErrorCode.INVALID_INPUT_VALUE, "takenAt은 UTC ISO8601 형식이어야 합니다.");
         }
@@ -146,7 +147,7 @@ public class SpotService {
             .filter(n -> n.contains("."))
             .map(n -> n.substring(n.lastIndexOf('.')))
             .orElse(".jpg");
-        String ym = DateTimeFormatter.ofPattern("yyyy/MM").format(LocalDate.now(ZoneOffset.UTC));
+        String ym = DateTimeFormatter.ofPattern("yyyy/MM").format(LocalDate.now(java.time.ZoneId.of("Asia/Seoul")));
         return basePath + ym + "/" + UUID.randomUUID() + ext;
     }
 
