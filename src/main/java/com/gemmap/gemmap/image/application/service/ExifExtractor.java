@@ -51,7 +51,7 @@ public class ExifExtractor {
         return Optional.ofNullable(metadata.getFirstDirectoryOfType(ExifSubIFDDirectory.class))
                 .map(dir -> dir.getDate(ExifSubIFDDirectory.TAG_DATETIME_ORIGINAL))
                 .map(Date::toInstant)
-                .map(instant -> LocalDateTime.ofInstant(instant, java.time.ZoneOffset.UTC));
+                .map(instant -> LocalDateTime.ofInstant(instant, java.time.ZoneId.of("Asia/Seoul")));
     }
 
     private static Optional<com.drew.lang.GeoLocation> extractGps(Metadata metadata) {
