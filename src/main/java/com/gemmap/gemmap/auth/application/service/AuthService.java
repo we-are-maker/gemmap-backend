@@ -26,6 +26,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.Optional;
 import java.util.UUID;
@@ -43,6 +44,8 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 public class AuthService {
+
+    private static final ZoneId KST = ZoneId.of("Asia/Seoul");
 
     private final UserRepository userRepository;
     private final JwtUtil jwtUtil;
@@ -414,7 +417,7 @@ public class AuthService {
             extension = originalFilename.substring(originalFilename.lastIndexOf("."));
         }
 
-        LocalDate now = LocalDate.now();
+        LocalDate now = LocalDate.now(KST);
         String datePath = now.format(DateTimeFormatter.ofPattern("yyyy/MM"));
         String uuid = UUID.randomUUID().toString();
 
