@@ -13,6 +13,7 @@ import org.hibernate.annotations.DynamicUpdate;
 import org.hibernate.annotations.SQLDelete;
 
 import java.time.LocalDate;
+import java.time.ZoneId;
 
 /**
  * 사용자 엔티티
@@ -42,9 +43,11 @@ public class User {
     @Enumerated(EnumType.STRING)
     private ERole role;
 
+    private static final ZoneId KST = ZoneId.of("Asia/Seoul");
+
     @Builder.Default
     @Column(name = "create_date", nullable = false)
-    private LocalDate createDate = LocalDate.now();
+    private LocalDate createDate = LocalDate.now(KST);
 
     @Column(name = "refresh_token")
     private String refreshToken;
@@ -93,7 +96,7 @@ public class User {
         this.socialId = socialId;
         this.eProvider = eProvider;
         this.role = role;
-        this.createDate = LocalDate.now();
+        this.createDate = LocalDate.now(KST);
         this.isLogin = false;
         this.isDeleted = false;
         this.email = email;
@@ -155,7 +158,7 @@ public class User {
 
     public void withdrawUser() {
         this.isDeleted = true;
-        this.deleteDate = LocalDate.now();
+        this.deleteDate = LocalDate.now(KST);
         this.refreshToken = null;
         this.isLogin = false;
     }
