@@ -4,7 +4,12 @@ import java.math.BigDecimal;
 
 public record SpotCreateRequest(
     String alias,
-    String address,
+    String sido,
+    String sigungu,
+    String eupmyeondong,
+    String roadName,
+    String buildingNo,
+    String fullAddress,
     String takenAt,
     BigDecimal latitude,
     BigDecimal longitude,
