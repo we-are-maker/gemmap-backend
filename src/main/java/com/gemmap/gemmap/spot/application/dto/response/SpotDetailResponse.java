@@ -17,7 +17,7 @@ public record SpotDetailResponse(
         String nickname,        // 사용자 닉네임
         String alias,           // 스팟 별칭
         String fileUrl,         // 사진 URL
-        String address,         // 도로명주소
+        String address,         // 전체 주소
         String takenAt,         // 촬영시각(KST, ISO-8601)
         BigDecimal latitude,    // 위도
         BigDecimal longitude,   // 경도
@@ -37,7 +37,7 @@ public record SpotDetailResponse(
                 .nickname(spotOwner.getNickname())
                 .alias(spot.getAlias())
                 .fileUrl(photo.getFileUrl())
-                .address(spot.getAddress())
+                .address(spot.getFullAddress())
                 .takenAt(toKstIso(photo.getTakenAt())) // LocalDateTime/Instant/OffsetDateTime 대응
                 .latitude(photo.getLatitude())
                 .longitude(photo.getLongitude())

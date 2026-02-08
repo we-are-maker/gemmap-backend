@@ -27,7 +27,6 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
-import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.List;
@@ -89,7 +88,13 @@ public class SpotService {
             Spot spot = spotRepository.save(
                 Spot.builder()
                     .user(user)
-                    .address(req.address())
+                    .sido(req.sido())
+                    .sigungu(req.sigungu())
+                    .eupmyeondong(req.eupmyeondong())
+                    .roadName(req.roadName())
+                    .buildingNo(req.buildingNo())
+                    .fullAddress(req.fullAddress())
+                    .shortAddress(req.sido() + " " + req.sigungu()) // 예: 경기도 남양주시 (리스트 화면용)
                     .alias(req.alias())
                     .build()
             );

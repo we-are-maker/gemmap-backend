@@ -11,14 +11,14 @@ public record SpotSummary(
         Long spotId,       // 스팟 ID
         String fileUrl,    // 사진 URL
         String alias,      // 스팟 별칭
-        String address     // 도로명주소
+        String address     // 단축 주소
 ) {
     public static SpotSummary of(Spot spot, String fileUrl) {
         return SpotSummary.builder()
                 .spotId(spot.getId())
                 .fileUrl(fileUrl)
                 .alias(spot.getAlias())
-                .address(spot.getAddress())
+                .address(spot.getShortAddress())
                 .build();
     }
 }

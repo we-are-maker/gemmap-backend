@@ -43,22 +43,29 @@ public class SpotController {
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseDto<SpotCreateResponse> create(
             @UserId Long userId,
-            @RequestParam(value = "file") MultipartFile file,
-            @RequestParam(value = "alias") String alias,
-            @RequestParam(value = "address") String address,
-            @RequestParam(value = "takenAt", required = false) String takenAt,
-            @RequestParam(value = "latitude") BigDecimal latitude,
-            @RequestParam(value = "longitude") BigDecimal longitude,
-            @RequestParam(value = "cameraMake", required = false) String cameraMake,
-            @RequestParam(value = "cameraModel", required = false) String cameraModel,
-            @RequestParam(value = "aperture", required = false) BigDecimal aperture,
-            @RequestParam(value = "shutterSpeed", required = false) String shutterSpeed,
-            @RequestParam(value = "iso", required = false) Integer iso,
-            @RequestParam(value = "focalLength", required = false) BigDecimal focalLength
+            @RequestParam MultipartFile file,
+            @RequestParam String alias,
+            // 주소 관련 파라미터
+            @RequestParam String sido,
+            @RequestParam String sigungu,
+            @RequestParam(required = false) String eupmyeondong,
+            @RequestParam(required = false) String roadName,
+            @RequestParam(required = false) String buildingNo,
+            @RequestParam String fullAddress,
+            // 기타 파라미터
+            @RequestParam(required = false) String takenAt,
+            @RequestParam BigDecimal latitude,
+            @RequestParam BigDecimal longitude,
+            @RequestParam(required = false) String cameraMake,
+            @RequestParam(required = false) String cameraModel,
+            @RequestParam(required = false) BigDecimal aperture,
+            @RequestParam(required = false) String shutterSpeed,
+            @RequestParam(required = false) Integer iso,
+            @RequestParam(required = false) BigDecimal focalLength
     ) {
         SpotCreateRequest request = new SpotCreateRequest(
-            alias, address, takenAt, latitude, longitude,
-            cameraMake, cameraModel, aperture, shutterSpeed, iso, focalLength
+            alias, sido, sigungu, eupmyeondong, roadName, buildingNo, fullAddress,
+            takenAt, latitude, longitude, cameraMake, cameraModel, aperture, shutterSpeed, iso, focalLength
         );
         return ResponseDto.created(spotService.create(userId, request, file));
     }
@@ -73,7 +80,7 @@ public class SpotController {
     @DeleteMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseDto<?> delete(
             @UserId Long userId,
-            @RequestParam(value = "spotId") Long spotId
+            @RequestParam Long spotId
     ) {
         spotService.delete(userId, spotId);
         return ResponseDto.noContent();
