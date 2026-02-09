@@ -22,8 +22,6 @@ public abstract class AbstractAuthenticationFailure {
         response.setStatus(errorCode.getHttpStatus().value());
 
         Map<String, Object> result = new HashMap<>();
-        result.put("success", false);
-        result.put("data", null);
         result.put("error", new ExceptionDto(errorCode, errorCode.getMessage()));
 
         response.getWriter().write(objectMapper.writeValueAsString(result));

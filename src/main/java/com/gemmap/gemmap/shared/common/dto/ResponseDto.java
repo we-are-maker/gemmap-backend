@@ -2,18 +2,21 @@ package com.gemmap.gemmap.shared.common.dto;
 
 import com.gemmap.gemmap.shared.exception.CommonException;
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import jakarta.annotation.Nullable;
 import org.springframework.http.HttpStatus;
 
 /**
  * 표준화된 API 응답 DTO
- * 모든 API 응답의 일관된 형식 제공 (data + error 구조)
+ * 모든 API 응답의 일관된 형식 제공 (data / error 구조)
  *
  * - 성공 응답 생성 (200 OK, 201 Created, 204 No Content)
  * - 실패 응답 생성 (GlobalExceptionHandler에서 사용)
  * - 제네릭을 통한 타입 안전성 보장
  * - HTTP 상태 코드와 응답 데이터의 일관된 구조 제공
+ * - null 필드는 JSON 응답에서 제외 (성공 시 error 미포함, 실패 시 data 미포함)
  */
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public record ResponseDto<T>(@JsonIgnore HttpStatus httpStatus,
                              @Nullable T data,
                              @Nullable ExceptionDto error) {
