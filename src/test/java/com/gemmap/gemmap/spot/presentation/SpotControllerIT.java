@@ -110,9 +110,7 @@ class SpotControllerIT {
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + getTestAccessToken()))
                 .andDo(print())
                 .andExpect(status().isUnsupportedMediaType())
-                .andExpect(jsonPath("$.error").exists())
-                .andExpect(jsonPath("$.error.code").value(40003))
-                .andExpect(jsonPath("$.data").doesNotExist());
+                .andExpect(jsonPath("$.code").value(41500));
         }
 
         @Test
@@ -133,8 +131,7 @@ class SpotControllerIT {
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + getTestAccessToken()))
                 .andDo(print())
                 .andExpect(status().isUnsupportedMediaType())
-                .andExpect(jsonPath("$.error").exists())
-                .andExpect(jsonPath("$.error.code").value(40003));
+                .andExpect(jsonPath("$.code").value(41500));
         }
 
         @Test
@@ -155,8 +152,7 @@ class SpotControllerIT {
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + getTestAccessToken()))
                 .andDo(print())
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.error").exists())
-                .andExpect(jsonPath("$.error.code").value(40000));
+                .andExpect(jsonPath("$.code").value(40000));
         }
     }
 
@@ -182,9 +178,8 @@ class SpotControllerIT {
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + getTestAccessToken()))
                 .andDo(print())
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.error").exists())
-                .andExpect(jsonPath("$.error.code").value(40000))
-                .andExpect(jsonPath("$.error.message").value("위도는 -90~90 범위여야 합니다."));
+                .andExpect(jsonPath("$.code").value(40000))
+                .andExpect(jsonPath("$.message").value("위도는 -90~90 범위여야 합니다."));
         }
 
         @Test
@@ -201,9 +196,8 @@ class SpotControllerIT {
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + getTestAccessToken()))
                 .andDo(print())
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.error").exists())
-                .andExpect(jsonPath("$.error.code").value(40000))
-                .andExpect(jsonPath("$.error.message").value("경도는 -180~180 범위여야 합니다."));
+                .andExpect(jsonPath("$.code").value(40000))
+                .andExpect(jsonPath("$.message").value("경도는 -180~180 범위여야 합니다."));
         }
     }
 
