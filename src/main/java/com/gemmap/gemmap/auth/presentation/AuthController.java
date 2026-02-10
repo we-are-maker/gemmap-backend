@@ -5,15 +5,13 @@ import com.gemmap.gemmap.auth.application.dto.response.RegisterResponseDto;
 import com.gemmap.gemmap.auth.application.service.AuthService;
 import com.gemmap.gemmap.shared.common.annotation.UserId;
 import com.gemmap.gemmap.shared.common.constants.Constant;
-import com.gemmap.gemmap.shared.common.dto.ResponseDto;
 import com.gemmap.gemmap.shared.exception.CommonException;
 import com.gemmap.gemmap.shared.exception.ErrorCode;
 import com.gemmap.gemmap.shared.util.HeaderUtil;
 import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
-import java.io.IOException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -33,7 +31,7 @@ public class AuthController {
      * 모바일 앱에서 획득한 카카오 Access Token으로 인증
      */
     @PostMapping("/kakao/login")
-    public ResponseDto<KakaoLoginResponseDto> kakaoSdkLogin(HttpServletRequest request) {
+    public ResponseEntity<KakaoLoginResponseDto> kakaoSdkLogin(HttpServletRequest request) {
         log.info("카카오 SDK 로그인 요청");
 
         // Authorization 헤더에서 카카오 Access Token 추출
@@ -42,7 +40,7 @@ public class AuthController {
 
         KakaoLoginResponseDto loginResponse = authService.authenticateWithKakaoAccessToken(kakaoAccessToken);
         log.info("카카오 SDK 로그인 성공 - 사용자 ID: {}", loginResponse.userId());
-        return ResponseDto.ok(loginResponse);
+        return ResponseEntity.ok(loginResponse);
     }
 
     /**
@@ -50,7 +48,7 @@ public class AuthController {
      * 닉네임과 프로필 이미지를 업데이트하고 권한을 USER로 변경
      */
     @PostMapping("/register")
-    public ResponseDto<RegisterResponseDto> register(
+    public ResponseEntity<RegisterResponseDto> register(
             @UserId Long userId,
             @RequestParam(value = "nickname", required = false) String nickname,
             @RequestParam(value = "profileImage", required = false) MultipartFile profileImage) {
@@ -58,7 +56,7 @@ public class AuthController {
                 userId, nickname != null, profileImage != null && !profileImage.isEmpty());
 
         RegisterResponseDto response = authService.register(userId, nickname, profileImage);
-        return ResponseDto.ok(response);
+        return ResponseEntity.ok(response);
     }
 
     /**
@@ -66,7 +64,7 @@ public class AuthController {
      * 서비스 JWT 액세스 토큰 갱신
      */
     @PostMapping("/refresh")
-    public ResponseDto<KakaoLoginResponseDto> refreshToken(HttpServletRequest request) {
+    public ResponseEntity<KakaoLoginResponseDto> refreshToken(HttpServletRequest request) {
         log.info("서비스 토큰 갱신 요청");
 
         // Authorization 헤더에서 서비스 Refresh Token 추출
@@ -74,7 +72,7 @@ public class AuthController {
                 .orElseThrow(() -> new CommonException(ErrorCode.INVALID_TOKEN));
 
         KakaoLoginResponseDto loginResponse = authService.refreshAccessToken(refreshToken);
-        return ResponseDto.ok(loginResponse);
+        return ResponseEntity.ok(loginResponse);
     }
 
     /**
@@ -82,10 +80,10 @@ public class AuthController {
      * 리프레시 토큰을 삭제하도록 하는 로그아웃
      */
     @PostMapping("/logout")
-    public ResponseDto<?> logout(@UserId Long userId) {
+    public ResponseEntity<Void> logout(@UserId Long userId) {
         log.info("서비스 로그아웃 요청 - 사용자 ID: {}", userId);
 
         authService.logout(userId);
-        return ResponseDto.noContent();
+        return ResponseEntity.noContent().build();
     }
 }
