@@ -12,8 +12,6 @@ public enum ErrorCode {
     // 400 Bad Request
     INVALID_INPUT_VALUE(40000, HttpStatus.BAD_REQUEST, "잘못된 입력 값입니다."),
     MISSING_REQUEST_PARAMETER(40001, HttpStatus.BAD_REQUEST, "요청 파라미터가 누락되었습니다."),
-    METHOD_NOT_ALLOWED(40002, HttpStatus.METHOD_NOT_ALLOWED, "허용되지 않은 HTTP 메서드입니다."),
-    UNSUPPORTED_MEDIA_TYPE(40003, HttpStatus.UNSUPPORTED_MEDIA_TYPE, "지원하지 않는 미디어 타입입니다."),
     DUPLICATE_RESOURCE(40004, HttpStatus.BAD_REQUEST, "이미 존재하는 리소스입니다."),
     VALIDATION_ERROR(40005, HttpStatus.BAD_REQUEST, "유효성 검사에 실패했습니다."),
     TYPE_MISMATCH(40006, HttpStatus.BAD_REQUEST, "요청 파라미터 타입이 올바르지 않습니다."),
@@ -35,11 +33,17 @@ public enum ErrorCode {
     ACCESS_DENIED(40300, HttpStatus.FORBIDDEN, "접근 권한이 없습니다."),
     INVALID_ROLE(40301, HttpStatus.FORBIDDEN, "요청한 리소스에 접근할 수 있는 권한이 없습니다."),
 
+    // 405 Method Not Allowed
+    METHOD_NOT_ALLOWED(40500, HttpStatus.METHOD_NOT_ALLOWED, "허용되지 않은 HTTP 메서드입니다."),
+
     // 404 Not Found
     RESOURCE_NOT_FOUND(40400, HttpStatus.NOT_FOUND, "요청한 리소스를 찾을 수 없습니다."),
     USER_NOT_FOUND(40401, HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다."),
     SPOT_NOT_FOUND(40402, HttpStatus.NOT_FOUND, "스팟을 찾을 수 없습니다."),
     SPOT_PHOTO_NOT_FOUND(40403, HttpStatus.NOT_FOUND, "스팟 사진을 찾을 수 없습니다."),
+
+    // 415 Unsupported Media Type
+    UNSUPPORTED_MEDIA_TYPE(41500, HttpStatus.UNSUPPORTED_MEDIA_TYPE, "지원하지 않는 미디어 타입입니다."),
 
     // 409 Conflict
     CONFLICT(40900, HttpStatus.CONFLICT, "요청이 현재 리소스 상태와 충돌합니다."),

@@ -1,7 +1,6 @@
 package com.gemmap.gemmap.spot.presentation;
 
 import com.gemmap.gemmap.shared.common.annotation.UserId;
-import com.gemmap.gemmap.shared.common.dto.ResponseDto;
 import com.gemmap.gemmap.spot.application.dto.request.SpotCreateRequest;
 import com.gemmap.gemmap.spot.application.dto.response.MySpotsResponse;
 import com.gemmap.gemmap.spot.application.dto.response.SpotCreateResponse;
@@ -9,7 +8,9 @@ import com.gemmap.gemmap.spot.application.dto.response.SpotDetailResponse;
 import com.gemmap.gemmap.spot.application.dto.response.SpotsResponse;
 import com.gemmap.gemmap.spot.application.service.SpotService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -41,7 +42,7 @@ public class SpotController {
      * @return 생성된 스팟 정보
      */
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ResponseDto<SpotCreateResponse> create(
+    public ResponseEntity<SpotCreateResponse> create(
             @UserId Long userId,
             @RequestParam MultipartFile file,
             @RequestParam String alias,
@@ -67,7 +68,7 @@ public class SpotController {
             alias, sido, sigungu, eupmyeondong, roadName, buildingNo, fullAddress,
             takenAt, latitude, longitude, cameraMake, cameraModel, aperture, shutterSpeed, iso, focalLength
         );
-        return ResponseDto.created(spotService.create(userId, request, file));
+        return ResponseEntity.status(HttpStatus.CREATED).body(spotService.create(userId, request, file));
     }
 
     /**
@@ -78,12 +79,12 @@ public class SpotController {
      * @return 삭제 성공 응답
      */
     @DeleteMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ResponseDto<?> delete(
+    public ResponseEntity<Void> delete(
             @UserId Long userId,
             @RequestParam Long spotId
     ) {
         spotService.delete(userId, spotId);
-        return ResponseDto.noContent();
+        return ResponseEntity.noContent().build();
     }
 
     /**
@@ -94,11 +95,11 @@ public class SpotController {
      * @return 스팟 상세 정보
      */
     @GetMapping("/{spotId}")
-    public ResponseDto<SpotDetailResponse> getSpotDetail(
+    public ResponseEntity<SpotDetailResponse> getSpotDetail(
             @UserId Long userId,
             @PathVariable Long spotId
     ) {
-        return ResponseDto.ok(spotService.getSpotDetail(userId, spotId));
+        return ResponseEntity.ok(spotService.getSpotDetail(userId, spotId));
     }
 
     /**
@@ -108,10 +109,10 @@ public class SpotController {
      * @return 내가 제보한 스팟 목록 (프로필 정보 + 스팟 목록)
      */
     @GetMapping("/me")
-    public ResponseDto<MySpotsResponse> getMySpots(
+    public ResponseEntity<MySpotsResponse> getMySpots(
             @UserId Long userId
     ) {
-        return ResponseDto.ok(spotService.getMySpots(userId));
+        return ResponseEntity.ok(spotService.getMySpots(userId));
     }
 
     /**
@@ -120,9 +121,9 @@ public class SpotController {
      * @param userId 인증된 사용자 ID
      */
     @GetMapping("/markers")
-    public ResponseDto<SpotsResponse> getSpots(
+    public ResponseEntity<SpotsResponse> getSpots(
             @UserId Long userId
     ) {
-        return ResponseDto.ok(spotService.getSpots(userId));
+        return ResponseEntity.ok(spotService.getSpots(userId));
     }
 }

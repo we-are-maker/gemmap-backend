@@ -1,6 +1,6 @@
 package com.gemmap.gemmap.shared.exception;
 
-import com.gemmap.gemmap.shared.common.dto.ResponseDto;
+import com.gemmap.gemmap.shared.common.dto.ExceptionDto;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.ResponseEntity;
@@ -22,7 +22,7 @@ import org.springframework.security.core.AuthenticationException;
 /**
  * 전역 예외 처리 핸들러
  *
- * - 애플리케이션에서 발생하는 모든 예외를 표준화된 ResponseDto 응답으로 변환
+ * - 애플리케이션에서 발생하는 모든 예외를 ExceptionDto 응답으로 변환
  * - JWT 토큰 관련 예외 처리
  * - Spring Security 인증/권한 예외 처리
  * - HTTP 요청 관련 예외 처리
@@ -32,33 +32,47 @@ import org.springframework.security.core.AuthenticationException;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
+    // ========== 공통 헬퍼 ==========
+
+    private ResponseEntity<ExceptionDto> toErrorResponse(ErrorCode errorCode) {
+        return ResponseEntity
+                .status(errorCode.getHttpStatus())
+                .body(new ExceptionDto(errorCode, errorCode.getMessage()));
+    }
+
+    private ResponseEntity<ExceptionDto> toErrorResponse(CommonException ex) {
+        return ResponseEntity
+                .status(ex.getErrorCode().getHttpStatus())
+                .body(new ExceptionDto(ex.getErrorCode(), ex.getMessage()));
+    }
+
     // ========== JWT 및 인증 관련 예외 처리 ==========
 
     /**
      * JWT 토큰 관련 예외 처리
      */
     @ExceptionHandler(JwtException.class)
-    public ResponseDto<?> handleJwtException(JwtException e) {
+    public ResponseEntity<ExceptionDto> handleJwtException(JwtException e) {
         log.error("JWT 토큰 예외 발생: {}", e.getMessage());
-        return ResponseDto.fail(new CommonException(ErrorCode.INVALID_TOKEN));
+        return toErrorResponse(ErrorCode.INVALID_TOKEN);
     }
 
     /**
      * 인증 실패 처리
      */
     @ExceptionHandler({BadCredentialsException.class, AuthenticationException.class})
-    public ResponseDto<?> handleAuthenticationException(Exception e) {
+    public ResponseEntity<ExceptionDto> handleAuthenticationException(Exception e) {
         log.error("인증 실패: {}", e.getMessage());
-        return ResponseDto.fail(new CommonException(ErrorCode.UNAUTHORIZED));
+        return toErrorResponse(ErrorCode.UNAUTHORIZED);
     }
 
     /**
      * 권한 부족 처리
      */
     @ExceptionHandler(AccessDeniedException.class)
-    public ResponseDto<?> handleAccessDeniedException(AccessDeniedException e) {
+    public ResponseEntity<ExceptionDto> handleAccessDeniedException(AccessDeniedException e) {
         log.error("권한 부족: {}", e.getMessage());
-        return ResponseDto.fail(new CommonException(ErrorCode.ACCESS_DENIED));
+        return toErrorResponse(ErrorCode.ACCESS_DENIED);
     }
 
     // ========== HTTP 요청 관련 예외 처리 ==========
@@ -67,63 +81,66 @@ public class GlobalExceptionHandler {
      * 지원하지 않는 Content-Type 요청 처리
      */
     @ExceptionHandler({HttpMediaTypeNotSupportedException.class, MultipartException.class})
-    public ResponseDto<?> handleHttpMediaTypeNotSupportedException(HttpMediaTypeNotSupportedException e) {
+    public ResponseEntity<ExceptionDto> handleHttpMediaTypeNotSupportedException(Exception e) {
         log.error("미디어 타입 오류: {}", e.getMessage());
-        return ResponseDto.fail(new CommonException(ErrorCode.UNSUPPORTED_MEDIA_TYPE));
+        return toErrorResponse(ErrorCode.UNSUPPORTED_MEDIA_TYPE);
     }
 
     /**
      * 존재하지 않는 URI 요청 처리 (404 Not Found)
      */
     @ExceptionHandler(NoHandlerFoundException.class)
-    public ResponseDto<?> handleNoHandlerFoundException(NoHandlerFoundException e) {
+    public ResponseEntity<ExceptionDto> handleNoHandlerFoundException(NoHandlerFoundException e) {
         log.error("핸들러 없음: {}", e.getMessage());
-        return ResponseDto.fail(new CommonException(ErrorCode.RESOURCE_NOT_FOUND));
+        return toErrorResponse(ErrorCode.RESOURCE_NOT_FOUND);
     }
 
     /**
      * JSON 파싱 실패 등 HTTP 메시지 바디 읽기 오류
      */
     @ExceptionHandler(HttpMessageNotReadableException.class)
-    public ResponseDto<?> handleHttpMessageNotReadableException(HttpMessageNotReadableException e) {
+    public ResponseEntity<ExceptionDto> handleHttpMessageNotReadableException(HttpMessageNotReadableException e) {
         log.error("메시지 읽기 오류: {}", e.getMessage());
-        return ResponseDto.fail(new CommonException(ErrorCode.INVALID_INPUT_VALUE));
+        return toErrorResponse(ErrorCode.INVALID_INPUT_VALUE);
     }
 
     /**
      * @Valid 유효성 검사 실패 처리
      */
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseDto<?> handleMethodArgumentNotValidException(MethodArgumentNotValidException e) {
+    public ResponseEntity<ExceptionDto> handleMethodArgumentNotValidException(MethodArgumentNotValidException e) {
         log.error("유효성 검사 실패: {}", e.getMessage());
-        return ResponseDto.fail(new CommonException(ErrorCode.VALIDATION_ERROR));
+        return toErrorResponse(ErrorCode.VALIDATION_ERROR);
     }
 
     /**
      * 지원하지 않는 HTTP 메서드 요청 처리
      */
     @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
-    public ResponseDto<?> handleHttpRequestMethodNotSupportedException(HttpRequestMethodNotSupportedException e) {
+    public ResponseEntity<ExceptionDto> handleHttpRequestMethodNotSupportedException(
+            HttpRequestMethodNotSupportedException e) {
         log.error("지원하지 않는 메서드: {}", e.getMessage());
-        return ResponseDto.fail(new CommonException(ErrorCode.METHOD_NOT_ALLOWED));
+        return toErrorResponse(ErrorCode.METHOD_NOT_ALLOWED);
     }
 
     /**
      * 요청 파라미터 타입 불일치 처리
      */
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
-    public ResponseDto<?> handleMethodArgumentTypeMismatchException(MethodArgumentTypeMismatchException e) {
+    public ResponseEntity<ExceptionDto> handleMethodArgumentTypeMismatchException(
+            MethodArgumentTypeMismatchException e) {
         log.error("파라미터 타입 오류: {}", e.getMessage());
-        return ResponseDto.fail(new CommonException(ErrorCode.TYPE_MISMATCH));
+        return toErrorResponse(ErrorCode.TYPE_MISMATCH);
     }
 
     /**
      * 필수 요청 파라미터 누락 처리
      */
     @ExceptionHandler(MissingServletRequestParameterException.class)
-    public ResponseDto<?> handleMissingServletRequestParameterException(MissingServletRequestParameterException e) {
+    public ResponseEntity<ExceptionDto> handleMissingServletRequestParameterException(
+            MissingServletRequestParameterException e) {
         log.error("필수 파라미터 누락: {}", e.getMessage());
-        return ResponseDto.fail(new CommonException(ErrorCode.MISSING_REQUEST_PARAMETER));
+        return toErrorResponse(ErrorCode.MISSING_REQUEST_PARAMETER);
     }
 
     // ========== 데이터베이스 및 비즈니스 예외 처리 ==========
@@ -132,26 +149,27 @@ public class GlobalExceptionHandler {
      * 데이터 무결성 위반 처리 (중복 키 등)
      */
     @ExceptionHandler(DataIntegrityViolationException.class)
-    public ResponseDto<?> handleDataIntegrityViolationException(DataIntegrityViolationException e) {
+    public ResponseEntity<ExceptionDto> handleDataIntegrityViolationException(
+            DataIntegrityViolationException e) {
         log.error("데이터 무결성 오류: {}", e.getMessage());
-        return ResponseDto.fail(new CommonException(ErrorCode.DUPLICATE_RESOURCE));
+        return toErrorResponse(ErrorCode.DUPLICATE_RESOURCE);
     }
 
     /**
      * 비즈니스 예외 처리
      */
     @ExceptionHandler(CommonException.class)
-    public ResponseDto<?> handleApiException(CommonException e) {
+    public ResponseEntity<ExceptionDto> handleApiException(CommonException e) {
         log.error("비즈니스 예외: {}", e.getMessage());
-        return ResponseDto.fail(e);
+        return toErrorResponse(e);
     }
 
     /**
      * 기타 모든 예외 처리 (최종 catch-all)
      */
     @ExceptionHandler(Exception.class)
-    public ResponseDto<?> handleException(Exception e) {
+    public ResponseEntity<ExceptionDto> handleException(Exception e) {
         log.error("시스템 오류: {}", e.getMessage());
-        return ResponseDto.fail(new CommonException(ErrorCode.INTERNAL_SERVER_ERROR));
+        return toErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR);
     }
 }

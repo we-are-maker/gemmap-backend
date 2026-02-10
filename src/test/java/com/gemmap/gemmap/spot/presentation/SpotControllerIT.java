@@ -26,10 +26,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 /**
  * 스팟 등록 API 통합 테스트
- *
- * <p>참고: ResponseDtoAdvice가 비활성화 상태이므로, 성공/실패 모두 HTTP 200을 반환합니다.
- * 에러 여부는 응답 body의 error 필드로 판별합니다.
- * 인증 실패(401)만 Spring Security에 의해 실제 HTTP 상태 코드가 설정됩니다.</p>
  */
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -113,10 +109,8 @@ class SpotControllerIT {
                     .param("longitude", "127.0")
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + getTestAccessToken()))
                 .andDo(print())
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.error").exists())
-                .andExpect(jsonPath("$.error.code").value(40003))
-                .andExpect(jsonPath("$.data").doesNotExist());
+                .andExpect(status().isUnsupportedMediaType())
+                .andExpect(jsonPath("$.code").value(41500));
         }
 
         @Test
@@ -136,9 +130,8 @@ class SpotControllerIT {
                     .param("longitude", "127.0")
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + getTestAccessToken()))
                 .andDo(print())
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.error").exists())
-                .andExpect(jsonPath("$.error.code").value(40003));
+                .andExpect(status().isUnsupportedMediaType())
+                .andExpect(jsonPath("$.code").value(41500));
         }
 
         @Test
@@ -158,9 +151,8 @@ class SpotControllerIT {
                     .param("longitude", "127.0")
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + getTestAccessToken()))
                 .andDo(print())
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.error").exists())
-                .andExpect(jsonPath("$.error.code").value(40000));
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(40000));
         }
     }
 
@@ -173,7 +165,7 @@ class SpotControllerIT {
     class CoordinateValidationTests {
 
         @Test
-        @DisplayName("위도 범위 초과 (lat=999) → error 응답")
+        @DisplayName("위도 범위 초과 (lat=999) → 400 error 응답")
         void createSpot_withInvalidLatitude_returnsError() throws Exception {
             mockMvc.perform(multipart("/api/v1/spots")
                     .file(jpegFile())
@@ -185,14 +177,13 @@ class SpotControllerIT {
                     .param("longitude", "127.0")
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + getTestAccessToken()))
                 .andDo(print())
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.error").exists())
-                .andExpect(jsonPath("$.error.code").value(40000))
-                .andExpect(jsonPath("$.error.message").value("위도는 -90~90 범위여야 합니다."));
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(40000))
+                .andExpect(jsonPath("$.message").value("위도는 -90~90 범위여야 합니다."));
         }
 
         @Test
-        @DisplayName("경도 범위 초과 (lon=-200) → error 응답")
+        @DisplayName("경도 범위 초과 (lon=-200) → 400 error 응답")
         void createSpot_withInvalidLongitude_returnsError() throws Exception {
             mockMvc.perform(multipart("/api/v1/spots")
                     .file(jpegFile())
@@ -204,10 +195,9 @@ class SpotControllerIT {
                     .param("longitude", "-200.0")
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + getTestAccessToken()))
                 .andDo(print())
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.error").exists())
-                .andExpect(jsonPath("$.error.code").value(40000))
-                .andExpect(jsonPath("$.error.message").value("경도는 -180~180 범위여야 합니다."));
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(40000))
+                .andExpect(jsonPath("$.message").value("경도는 -180~180 범위여야 합니다."));
         }
     }
 
