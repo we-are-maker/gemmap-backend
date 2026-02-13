@@ -5,10 +5,17 @@ import com.gemmap.gemmap.shared.common.enums.ESpotPhotoType;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
+import org.locationtech.jts.geom.Point;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
+/**
+ * 스팟 사진 엔티티
+ *
+ * 스팟에 귀속된 사진 및 좌표/EXIF 메타데이터를 관리한다.
+ * location 필드는 Spatial Index를 통한 공간 쿼리에 사용된다.
+ */
 @Entity
 @Table(name = "spot_photos")
 @Getter
@@ -44,6 +51,10 @@ public class SpotPhoto {
 
     @Column(precision = 11, scale = 8, nullable = false)
     private BigDecimal longitude; // 경도
+
+    // Spatial POINT 컬럼 - Hibernate Spatial이 MySQL POINT 타입과 매핑
+    @Column(name = "location", columnDefinition = "POINT SRID 4326", nullable = false)
+    private Point location;
 
     @Column(name = "camera_make", length = 100)
     private String cameraMake; // 카메라 브랜드

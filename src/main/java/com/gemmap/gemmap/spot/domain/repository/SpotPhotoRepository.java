@@ -5,6 +5,7 @@ import com.gemmap.gemmap.shared.common.enums.ESpotPhotoType;
 import com.gemmap.gemmap.spot.domain.entity.Spot;
 import com.gemmap.gemmap.spot.domain.entity.SpotPhoto;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
 
 import java.util.List;
 import java.util.Optional;
@@ -20,11 +21,28 @@ public interface SpotPhotoRepository extends JpaRepository<SpotPhoto, Long> {
     /**
      * 특정 스팟 + 특정 사용자 + 특정 타입의 대표 사진 조회 (최신순)
      * 내가 제보한 스팟 목록 조회 시 사용
-     *
-     * @param spot 스팟
-     * @param user 사용자
-     * @param type 사진 타입
-     * @return 대표 사진
      */
     Optional<SpotPhoto> findFirstBySpotAndUserAndTypeOrderByCreatedAtDesc(Spot spot, User user, ESpotPhotoType type);
+
+    /**
+     * Bounding Box 내 마커 조회 (Spatial Index 활용)
+     *
+     * ST_MakeEnvelope로 사각형 생성 → ST_Contains로 포함 여부 검사.
+     * R-Tree 인덱스로 O(log n) 성능.
+     */
+    @Query(value = """
+        SELECT sp.* FROM spot_photos sp
+        WHERE sp.type = :type
+        AND ST_Contains(
+            ST_SRID(ST_MakeEnvelope(
+                Point(:swLng, :swLat),
+                Point(:neLng, :neLat)
+            ), 4326),
+            sp.location
+        )
+        ORDER BY sp.created_at DESC
+        LIMIT :limit
+        """, nativeQuery = true)
+    List<SpotPhoto> findWithinBoundingBox(double swLng, double swLat, double neLng, double neLat,
+                                          String type, int limit);
 }
