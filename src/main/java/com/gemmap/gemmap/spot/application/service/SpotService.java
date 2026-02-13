@@ -8,6 +8,7 @@ import com.gemmap.gemmap.shared.common.enums.ESpotPhotoType;
 import com.gemmap.gemmap.shared.config.s3.S3Properties;
 import com.gemmap.gemmap.shared.exception.CommonException;
 import com.gemmap.gemmap.shared.exception.ErrorCode;
+import com.gemmap.gemmap.shared.util.SpatialUtils;
 import com.gemmap.gemmap.spot.application.dto.request.SpotCreateRequest;
 import com.gemmap.gemmap.spot.application.dto.response.*;
 import com.gemmap.gemmap.spot.application.support.SpotFileValidator;
@@ -108,6 +109,7 @@ public class SpotService {
                 .takenAt(parseTakenAt(req.takenAt()))
                 .latitude(req.latitude())
                 .longitude(req.longitude())
+                .location(SpatialUtils.createPoint(req.longitude(), req.latitude()))
                 .cameraMake(req.cameraMake())
                 .cameraModel(req.cameraModel())
                 .focalLength(req.focalLength())
