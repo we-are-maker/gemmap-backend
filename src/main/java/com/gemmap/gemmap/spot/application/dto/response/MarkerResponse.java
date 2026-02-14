@@ -7,10 +7,8 @@ import java.math.BigDecimal;
 import java.util.List;
 
 /** 마커 조회 응답 DTO **/
-@Builder
 public record MarkerResponse(
-        List<MarkerInfo> markers,
-        int returnedCount
+        List<MarkerInfo> markers
 ) {
 
     /** 개별 마커 정보 **/
@@ -29,9 +27,6 @@ public record MarkerResponse(
                         photo.getLongitude()))
                 .toList();
 
-        return MarkerResponse.builder()
-                .markers(markers)
-                .returnedCount(markers.size())
-                .build();
+        return new MarkerResponse(markers);
     }
 }
