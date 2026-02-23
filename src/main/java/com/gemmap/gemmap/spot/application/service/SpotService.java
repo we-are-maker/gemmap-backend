@@ -2,8 +2,10 @@ package com.gemmap.gemmap.spot.application.service;
 
 import com.gemmap.gemmap.auth.domain.entity.User;
 import com.gemmap.gemmap.auth.domain.repository.UserRepository;
+import com.gemmap.gemmap.bookmark.application.service.BookmarkService;
 import com.gemmap.gemmap.image.infrastructure.objectstorage.ObjectStorageService;
 import com.gemmap.gemmap.image.infrastructure.objectstorage.S3UrlGenerator;
+import com.gemmap.gemmap.shared.common.enums.EAttractionLevel;
 import com.gemmap.gemmap.shared.common.enums.ESpotPhotoType;
 import com.gemmap.gemmap.shared.config.s3.S3Properties;
 import com.gemmap.gemmap.shared.exception.CommonException;
@@ -33,7 +35,6 @@ import java.time.format.DateTimeParseException;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -42,6 +43,7 @@ public class SpotService {
 
     private static final ZoneId KST = ZoneId.of("Asia/Seoul");
 
+    private final BookmarkService bookmarkService;
     private final SpotRepository spotRepository;
     private final UserRepository userRepository;
     private final SpotPhotoRepository spotPhotoRepository;
@@ -262,8 +264,7 @@ public class SpotService {
             .map(SpotPhoto::getFileUrl)
             .toList();
 
-        // 5) DB 삭제 (트랜잭션 내): spot_photos → spots 순서 (cascade 없으므로 명시 삭제)
-        spotPhotoRepository.deleteAll(photos);
+        // 5) DB 삭제
         spotRepository.delete(spot);
 
         // 6) Object Storage 삭제 (트랜잭션 외부, 베스트 에포트)
@@ -312,47 +313,56 @@ public class SpotService {
                 findFirstBySpotAndTypeOrderByCreatedAtDesc(spot, ESpotPhotoType.SPOT)
                 .orElseThrow(() -> new CommonException(ErrorCode.SPOT_PHOTO_NOT_FOUND, "스팟 사진이 존재하지 않습니다."));
 
-        // 5) 응답 DTO 변환
-        return SpotDetailResponse.from(spot, spotOwner, representativePhoto);
+        // 5) 끌림지수(나의 평가) 조회 - 찜하기 하지 않은 경우 null
+        EAttractionLevel attractionLevel = bookmarkService.getAttractionLevel(userId, spotId);
+
+        // 6) 응답 DTO 변환
+        return SpotDetailResponse.from(spot, spotOwner, representativePhoto, attractionLevel);
     }
 
     /**
-     * 내가 제보한 스팟 목록 조회
-     *
-     * @param userId 요청 사용자 ID
-     * @return MySpotsResponse
+     * 마이 스팟 조회 (사용자 정보 + 카운트: 제보/찜)
      */
     @Transactional(readOnly = true)
     public MySpotsResponse getMySpots(Long userId) {
-        // 1) 사용자 조회
+        // 사용자 조회
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new CommonException(ErrorCode.USER_NOT_FOUND));
 
-        // 2) 사용자가 등록한 스팟 전체 개수 조회
-        Integer totalCount = spotRepository.countByUser(user);
+        // 제보한 젬 개수
+        Integer createdCount = spotRepository.countByUser(user);
+        // 찜한 젬 개수
+        Integer bookmarkedCount = bookmarkService.getBookmarkedCount(userId);
 
-        // 3) 사용자가 등록한 스팟 목록 조회 (최신순)
+        return MySpotsResponse.of(user, createdCount, bookmarkedCount);
+    }
+
+    /**
+     * 제보한 젬 목록 조회
+     */
+    @Transactional(readOnly = true)
+    public MyCreatedSpotsResponse getMyCreatedSpots(Long userId) {
+        // 사용자 조회
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new CommonException(ErrorCode.USER_NOT_FOUND));
+
+        // 사용자가 등록한 스팟 목록 조회 (최신순)
         List<Spot> spots = spotRepository.findByUserOrderByCreatedAtDesc(user);
 
-        // 4) 각 스팟에 대한 사진(type=SPOT, user=요청 사용자) 조회 후 DTO 변환
-        //    - 사진 없으면 해당 스팟은 노출하되 fileUrl = null
-        //    - 스팟 목록 자체가 없으면 자연스럽게 빈 리스트 반환
-        // TODO: N+1 문제 보완 가능 - @EntityGraph 또는 Batch Fetch 전략 고려
-        // 현재 요구사항에서는 per-spot 1회 조회로 충분하나, 스팟이 많아질 경우 최적화 필요
+        // 각 스팟의 대표 사진 URL 조회 -> SpotSummary 변환
         List<SpotSummary> spotSummaries = spots.stream()
                 .map(spot -> {
-                    // 각 spot마다 DB 쿼리 1회 발생 → N+1 문제
                     String fileUrl = spotPhotoRepository
                             .findFirstBySpotAndUserAndTypeOrderByCreatedAtDesc(spot, user, ESpotPhotoType.SPOT)
                             .map(SpotPhoto::getFileUrl)
                             .orElse(null);
                     return SpotSummary.of(spot, fileUrl);
                 })
-                .collect(Collectors.toList());
+                .toList();
 
-        // 5) 응답 DTO 변환
-        return MySpotsResponse.of(user, totalCount, spotSummaries);
+        return MyCreatedSpotsResponse.of(spotSummaries);
     }
+
 
     /**
      * 지도 전체 마커 조회

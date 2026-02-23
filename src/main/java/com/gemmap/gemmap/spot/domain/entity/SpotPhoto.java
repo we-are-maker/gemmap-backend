@@ -5,6 +5,8 @@ import com.gemmap.gemmap.shared.common.enums.ESpotPhotoType;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.OnDelete;
+import org.hibernate.annotations.OnDeleteAction;
 import org.locationtech.jts.geom.Point;
 
 import java.math.BigDecimal;
@@ -30,6 +32,7 @@ public class SpotPhoto {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "spot_id", nullable = false)
+    @OnDelete(action = OnDeleteAction.CASCADE)
     private Spot spot; // 스팟 id
 
     @ManyToOne(fetch = FetchType.LAZY)

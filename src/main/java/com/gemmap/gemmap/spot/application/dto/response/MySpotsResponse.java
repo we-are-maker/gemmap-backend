@@ -12,15 +12,15 @@ import java.util.List;
 public record MySpotsResponse(
         String profileImage,    // 사용자 프로필 이미지
         String nickname,        // 사용자 닉네임
-        Integer mySpotCount,    // 제보한 젬 개수 (전체)
-        List<SpotSummary> spots // 제보한 젬 목록
+        Integer createdCount, // 제보한 젬 개수
+        Integer bookmarkedCount   // 찜(북마크)한 젬 개수
 ) {
-    public static MySpotsResponse of(User user, Integer totalCount, List<SpotSummary> spots) {
+    public static MySpotsResponse of(User user, Integer createdCount, Integer bookmarkedCount) {
         return MySpotsResponse.builder()
                 .profileImage(user.getProfileImage())
                 .nickname(user.getNickname())
-                .mySpotCount(totalCount)
-                .spots(spots)
+                .createdCount(createdCount)
+                .bookmarkedCount(bookmarkedCount)
                 .build();
     }
 }

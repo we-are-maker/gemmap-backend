@@ -1,12 +1,12 @@
 package com.gemmap.gemmap.spot.presentation;
 
+import com.gemmap.gemmap.bookmark.application.dto.response.MyBookmarksResponse;
+import com.gemmap.gemmap.bookmark.application.service.BookmarkService;
 import com.gemmap.gemmap.shared.common.annotation.UserId;
 import com.gemmap.gemmap.spot.application.dto.request.SpotCreateRequest;
-import com.gemmap.gemmap.spot.application.dto.response.MySpotsResponse;
-import com.gemmap.gemmap.spot.application.dto.response.SpotCreateResponse;
-import com.gemmap.gemmap.spot.application.dto.response.SpotDetailResponse;
-import com.gemmap.gemmap.spot.application.dto.response.SpotsResponse;
+import com.gemmap.gemmap.spot.application.dto.response.*;
 import com.gemmap.gemmap.spot.application.service.SpotService;
+import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -22,24 +22,10 @@ import java.math.BigDecimal;
 public class SpotController {
 
     private final SpotService spotService;
+    private final BookmarkService bookmarkService;
 
     /**
      * 스팟 생성
-     *
-     * @param userId 인증된 사용자 ID
-     * @param file 업로드할 이미지 파일
-     * @param alias 스팟 별칭
-     * @param address 도로명 주소
-     * @param takenAt 촬영 시각 (UTC ISO8601 형식, optional)
-     * @param latitude 위도
-     * @param longitude 경도
-     * @param cameraMake 카메라 브랜드 (optional)
-     * @param cameraModel 카메라 모델 (optional)
-     * @param aperture 조리개 값 (optional)
-     * @param shutterSpeed 셔터 속도 (optional)
-     * @param iso ISO 값 (optional)
-     * @param focalLength 초점 거리 (optional)
-     * @return 생성된 스팟 정보
      */
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<SpotCreateResponse> create(
@@ -73,10 +59,6 @@ public class SpotController {
 
     /**
      * 스팟 삭제
-     *
-     * @param userId 인증된 사용자 ID
-     * @param spotId 삭제할 스팟 ID
-     * @return 삭제 성공 응답
      */
     @DeleteMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<Void> delete(
@@ -89,10 +71,6 @@ public class SpotController {
 
     /**
      * 스팟 상세 조회
-     *
-     * @param userId 인증된 사용자 ID
-     * @param spotId 조회할 스팟 ID
-     * @return 스팟 상세 정보
      */
     @GetMapping("/{spotId}")
     public ResponseEntity<SpotDetailResponse> getSpotDetail(
@@ -103,10 +81,7 @@ public class SpotController {
     }
 
     /**
-     * 내가 제보한 스팟 목록 조회
-     *
-     * @param userId 인증된 사용자 ID
-     * @return 내가 제보한 스팟 목록 (프로필 정보 + 스팟 목록)
+     * 마이 스팟 조회 (사용자 정보 + 카운트: 제보/찜)
      */
     @GetMapping("/me")
     public ResponseEntity<MySpotsResponse> getMySpots(
@@ -116,9 +91,27 @@ public class SpotController {
     }
 
     /**
+     * 제보한 젬 목록 조회 (마이스팟)
+     */
+    @GetMapping("/me/created")
+    public ResponseEntity<MyCreatedSpotsResponse> getMyCreatedSpots(
+            @UserId Long userId
+    ) {
+        return ResponseEntity.ok(spotService.getMyCreatedSpots(userId));
+    }
+
+    /**
+     * 찜한 젬 목록 조회 (마이스팟)
+     */
+    @GetMapping("/me/bookmarked")
+    public ResponseEntity<MyBookmarksResponse> getMyBookmarkedSpots(
+            @UserId Long userId
+    ) {
+        return ResponseEntity.ok(bookmarkService.getMyBookmarkedSpots(userId));
+    }
+
+    /**
      * 지도 전체 마커 조회
-     *
-     * @param userId 인증된 사용자 ID
      */
     @GetMapping("/markers")
     public ResponseEntity<SpotsResponse> getSpots(
