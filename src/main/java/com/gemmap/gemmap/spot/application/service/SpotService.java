@@ -313,8 +313,11 @@ public class SpotService {
                 findFirstBySpotAndTypeOrderByCreatedAtDesc(spot, ESpotPhotoType.SPOT)
                 .orElseThrow(() -> new CommonException(ErrorCode.SPOT_PHOTO_NOT_FOUND, "스팟 사진이 존재하지 않습니다."));
 
-        // 5) 응답 DTO 변환
-        return SpotDetailResponse.from(spot, spotOwner, representativePhoto);
+        // 5) 끌림지수(나의 평가) 조회 - 찜하기 하지 않은 경우 null
+        EAttractionLevel attractionLevel = bookmarkService.getAttractionLevel(userId, spotId);
+
+        // 6) 응답 DTO 변환
+        return SpotDetailResponse.from(spot, spotOwner, representativePhoto, attractionLevel);
     }
 
     /**
