@@ -41,7 +41,8 @@ public class Constant {
     public static final String[] USER_URLS = {
             "/api/v1/users/**",
             "/api/v1/spots/**",
-            "/api/v1/markers/**"
+            "/api/v1/markers/**",
+            "/api/v1/bookmarks/**"
     };
 
     // 관리자만 접근 가능한 경로

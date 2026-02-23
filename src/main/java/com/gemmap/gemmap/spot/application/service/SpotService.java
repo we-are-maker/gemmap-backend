@@ -2,6 +2,7 @@ package com.gemmap.gemmap.spot.application.service;
 
 import com.gemmap.gemmap.auth.domain.entity.User;
 import com.gemmap.gemmap.auth.domain.repository.UserRepository;
+import com.gemmap.gemmap.bookmark.application.service.BookmarkService;
 import com.gemmap.gemmap.image.infrastructure.objectstorage.ObjectStorageService;
 import com.gemmap.gemmap.image.infrastructure.objectstorage.S3UrlGenerator;
 import com.gemmap.gemmap.shared.common.enums.ESpotPhotoType;
@@ -42,6 +43,7 @@ public class SpotService {
 
     private static final ZoneId KST = ZoneId.of("Asia/Seoul");
 
+    private final BookmarkService bookmarkService;
     private final SpotRepository spotRepository;
     private final UserRepository userRepository;
     private final SpotPhotoRepository spotPhotoRepository;
@@ -262,8 +264,7 @@ public class SpotService {
             .map(SpotPhoto::getFileUrl)
             .toList();
 
-        // 5) DB 삭제 (트랜잭션 내): spot_photos → spots 순서 (cascade 없으므로 명시 삭제)
-        spotPhotoRepository.deleteAll(photos);
+        // 5) DB 삭제
         spotRepository.delete(spot);
 
         // 6) Object Storage 삭제 (트랜잭션 외부, 베스트 에포트)
