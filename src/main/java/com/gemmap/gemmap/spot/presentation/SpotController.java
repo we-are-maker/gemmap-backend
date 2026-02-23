@@ -1,5 +1,7 @@
 package com.gemmap.gemmap.spot.presentation;
 
+import com.gemmap.gemmap.bookmark.application.dto.response.MyBookmarksResponse;
+import com.gemmap.gemmap.bookmark.application.service.BookmarkService;
 import com.gemmap.gemmap.shared.common.annotation.UserId;
 import com.gemmap.gemmap.spot.application.dto.request.SpotCreateRequest;
 import com.gemmap.gemmap.spot.application.dto.response.MySpotsResponse;
@@ -22,6 +24,7 @@ import java.math.BigDecimal;
 public class SpotController {
 
     private final SpotService spotService;
+    private final BookmarkService bookmarkService;
 
     /**
      * 스팟 생성
@@ -113,6 +116,16 @@ public class SpotController {
             @UserId Long userId
     ) {
         return ResponseEntity.ok(spotService.getMySpots(userId));
+    }
+
+    /**
+     * 찜한 젬 목록 조회 (마이스팟)
+     */
+    @GetMapping("/me/bookmarked")
+    public ResponseEntity<MyBookmarksResponse> getMyBookmarkedSpots(
+            @UserId Long userId
+    ) {
+        return ResponseEntity.ok(bookmarkService.getMyBookmarkedSpots(userId));
     }
 
     /**
