@@ -118,4 +118,13 @@ public class BookmarkService {
     public Integer getBookmarkedCount(Long userId) {
         return spotBookmarkRepository.countByUserId(userId);
     }
+
+    /**
+     * 스팟의 찜 받은 개수 조회
+     * → SpotService.getSpotDetail() 에서 호출
+     */
+    @Transactional(readOnly = true)
+    public Integer getBookmarkedCountBySpot(Long spotId) {
+        return spotBookmarkRepository.countBySpotId(spotId);
+    }
 }

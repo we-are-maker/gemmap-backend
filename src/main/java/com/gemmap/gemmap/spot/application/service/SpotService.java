@@ -316,8 +316,11 @@ public class SpotService {
         // 5) 끌림지수(나의 평가) 조회 - 찜하기 하지 않은 경우 null
         EAttractionLevel attractionLevel = bookmarkService.getAttractionLevel(userId, spotId);
 
-        // 6) 응답 DTO 변환
-        return SpotDetailResponse.from(spot, spotOwner, representativePhoto, attractionLevel);
+        // 6) 이 스팟(젬)을 찜한 총 개수 조회
+        Integer bookmarkedCount = bookmarkService.getBookmarkedCountBySpot(spotId);
+
+        // 7) 응답 DTO 변환
+        return SpotDetailResponse.from(spot, spotOwner, representativePhoto, bookmarkedCount, attractionLevel);
     }
 
     /**
