@@ -21,4 +21,7 @@ public interface SpotBookmarkRepository extends JpaRepository<SpotBookmark, Long
 
     /** 찜한 젬 개수 **/
     Integer countByUserId(Long userId);
+
+    /** 스팟의 찜 받은 개수 **/
+    Integer countBySpotId(Long spotId);
 }

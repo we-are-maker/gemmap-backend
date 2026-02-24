@@ -19,6 +19,7 @@ public record SpotDetailResponse(
         String alias,                     // 스팟 별칭
         String fileUrl,                   // 사진 URL
         String address,                   // 전체 주소
+        Integer bookmarkedCount,          // 찜한 총 개수
         EAttractionLevel attractionLevel, // 나의 평가 (끌림지수), null이면 찜하기 하지 않은 경우
         String takenAt,                   // 촬영시각(KST, ISO-8601)
         BigDecimal latitude,              // 위도
@@ -32,7 +33,9 @@ public record SpotDetailResponse(
         String createdAt                  // 생성시각(스팟, KST, ISO-8601)
 ) {
 
-    public static SpotDetailResponse from (Spot spot, User spotOwner, SpotPhoto photo, EAttractionLevel attractionLevel) {
+    public static SpotDetailResponse from (Spot spot, User spotOwner, SpotPhoto photo,
+                                           Integer bookmarkedCount,
+                                           EAttractionLevel attractionLevel) {
         return SpotDetailResponse.builder()
                 .spotId(spot.getId())
                 .profileImage(spotOwner.getProfileImage())
@@ -40,6 +43,7 @@ public record SpotDetailResponse(
                 .alias(spot.getAlias())
                 .fileUrl(photo.getFileUrl())
                 .address(spot.getFullAddress())
+                .bookmarkedCount(bookmarkedCount)
                 .attractionLevel(attractionLevel)
                 .takenAt(toKstIso(photo.getTakenAt())) // LocalDateTime/Instant/OffsetDateTime 대응
                 .latitude(photo.getLatitude())
