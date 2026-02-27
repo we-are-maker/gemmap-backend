@@ -2,8 +2,8 @@ package com.gemmap.gemmap.spot.application.service;
 
 import com.gemmap.gemmap.auth.domain.entity.User;
 import com.gemmap.gemmap.auth.domain.repository.UserRepository;
-import com.gemmap.gemmap.image.infrastructure.objectstorage.ObjectStorageService;
-import com.gemmap.gemmap.image.infrastructure.objectstorage.S3UrlGenerator;
+import com.gemmap.gemmap.shared.infrastructure.objectstorage.ObjectStorageService;
+import com.gemmap.gemmap.shared.infrastructure.objectstorage.S3UrlGenerator;
 import com.gemmap.gemmap.shared.config.s3.S3Properties;
 import com.gemmap.gemmap.shared.exception.CommonException;
 import com.gemmap.gemmap.shared.exception.ErrorCode;

@@ -42,6 +42,7 @@ public enum ErrorCode {
     SPOT_NOT_FOUND(40402, HttpStatus.NOT_FOUND, "스팟을 찾을 수 없습니다."),
     SPOT_PHOTO_NOT_FOUND(40403, HttpStatus.NOT_FOUND, "스팟 사진을 찾을 수 없습니다."),
     BOOKMARK_NOT_FOUND(40404, HttpStatus.NOT_FOUND, "북마크를 찾을 수 없습니다."),
+    CHECKIN_NOT_FOUND(40405, HttpStatus.NOT_FOUND, "체크인을 찾을 수 없습니다."),
 
     // 415 Unsupported Media Type
     UNSUPPORTED_MEDIA_TYPE(41500, HttpStatus.UNSUPPORTED_MEDIA_TYPE, "지원하지 않는 미디어 타입입니다."),
@@ -51,6 +52,7 @@ public enum ErrorCode {
     ALREADY_EXISTS(40901, HttpStatus.CONFLICT, "이미 존재하는 데이터입니다."),
     ALREADY_REGISTERED_USER(40902, HttpStatus.CONFLICT, "이미 회원가입이 완료된 사용자입니다."),
     BOOKMARK_ALREADY_EXISTS(40903, HttpStatus.CONFLICT, "이미 찜한 젬입니다."),
+    CHECKIN_ALREADY_EXISTS(40904, HttpStatus.CONFLICT, "이미 체크인한 젬입니다."),
 
     // 500 Internal Server Error
     INTERNAL_SERVER_ERROR(50000, HttpStatus.INTERNAL_SERVER_ERROR, "서버 내부 오류입니다."),

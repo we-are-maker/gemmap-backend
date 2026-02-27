@@ -2,6 +2,7 @@ package com.gemmap.gemmap.spot.application.dto.response;
 
 import com.gemmap.gemmap.auth.domain.entity.User;
 import com.gemmap.gemmap.shared.common.enums.EAttractionLevel;
+import com.gemmap.gemmap.shared.common.enums.ERecommendationLevel;
 import com.gemmap.gemmap.spot.domain.entity.Spot;
 import com.gemmap.gemmap.spot.domain.entity.SpotPhoto;
 import lombok.Builder;
@@ -13,29 +14,31 @@ import java.time.temporal.ChronoUnit;
 
 @Builder
 public record SpotDetailResponse(
-        Long spotId,                      // 스팟 ID
-        String profileImage,              // 사용자 프로필 이미지
-        String nickname,                  // 사용자 닉네임
-        String alias,                     // 스팟 별칭
-        String fileUrl,                   // 사진 URL
-        String address,                   // 전체 주소
-        Integer bookmarkedCount,          // 찜한 총 개수
-        EAttractionLevel attractionLevel, // 나의 평가 (끌림지수), null이면 찜하기 하지 않은 경우
-        String takenAt,                   // 촬영시각(KST, ISO-8601)
-        BigDecimal latitude,              // 위도
-        BigDecimal longitude,             // 경도
-        String cameraMake,                // 카메라 브랜드
-        String cameraModel,               // 카메라 모델
-        BigDecimal aperture,              // 조리개
-        String shutterSpeed,              // 셔터속도
-        Integer iso,                      // ISO
-        BigDecimal focalLength,           // 초점거리
-        String createdAt                  // 생성시각(스팟, KST, ISO-8601)
+        Long spotId,                              // 스팟 ID
+        String profileImage,                      // 사용자 프로필 이미지
+        String nickname,                          // 사용자 닉네임
+        String alias,                             // 스팟 별칭
+        String fileUrl,                           // 사진 URL
+        String address,                           // 전체 주소
+        Integer bookmarkedCount,                  // 찜한 총 개수
+        Integer checkedInCount,                   // 체크인한 총 개수
+        EAttractionLevel attractionLevel,         // 나의 평가 (끌림지수), null이면 찜하기 하지 않은 경우
+        ERecommendationLevel recommendationLevel, // 나의 평가 (추천지수), null이면 체크인 하지 않은 경우
+        String takenAt,                           // 촬영시각(KST, ISO-8601)
+        BigDecimal latitude,                      // 위도
+        BigDecimal longitude,                     // 경도
+        String cameraMake,                        // 카메라 브랜드
+        String cameraModel,                       // 카메라 모델
+        BigDecimal aperture,                      // 조리개
+        String shutterSpeed,                      // 셔터속도
+        Integer iso,                              // ISO
+        BigDecimal focalLength,                   // 초점거리
+        String createdAt                          // 생성시각(스팟, KST, ISO-8601)
 ) {
 
     public static SpotDetailResponse from (Spot spot, User spotOwner, SpotPhoto photo,
-                                           Integer bookmarkedCount,
-                                           EAttractionLevel attractionLevel) {
+                                           Integer bookmarkedCount, Integer checkedInCount,
+                                           EAttractionLevel attractionLevel, ERecommendationLevel recommendationLevel) {
         return SpotDetailResponse.builder()
                 .spotId(spot.getId())
                 .profileImage(spotOwner.getProfileImage())
@@ -44,7 +47,9 @@ public record SpotDetailResponse(
                 .fileUrl(photo.getFileUrl())
                 .address(spot.getFullAddress())
                 .bookmarkedCount(bookmarkedCount)
+                .checkedInCount(checkedInCount)
                 .attractionLevel(attractionLevel)
+                .recommendationLevel(recommendationLevel)
                 .takenAt(toKstIso(photo.getTakenAt())) // LocalDateTime/Instant/OffsetDateTime 대응
                 .latitude(photo.getLatitude())
                 .longitude(photo.getLongitude())

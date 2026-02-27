@@ -10,17 +10,19 @@ import java.util.List;
  */
 @Builder
 public record MySpotsResponse(
-        String profileImage,    // 사용자 프로필 이미지
-        String nickname,        // 사용자 닉네임
-        Integer createdCount, // 제보한 젬 개수
-        Integer bookmarkedCount   // 찜(북마크)한 젬 개수
+        String profileImage,     // 사용자 프로필 이미지
+        String nickname,         // 사용자 닉네임
+        Integer createdCount,    // 제보한 젬 개수
+        Integer bookmarkedCount, // 찜(북마크)한 젬 개수
+        Integer checkedInCount   // 체크인한 젬 개수
 ) {
-    public static MySpotsResponse of(User user, Integer createdCount, Integer bookmarkedCount) {
+    public static MySpotsResponse of(User user, Integer createdCount, Integer bookmarkedCount, Integer checkedInCount) {
         return MySpotsResponse.builder()
                 .profileImage(user.getProfileImage())
                 .nickname(user.getNickname())
                 .createdCount(createdCount)
                 .bookmarkedCount(bookmarkedCount)
+                .checkedInCount(checkedInCount)
                 .build();
     }
 }

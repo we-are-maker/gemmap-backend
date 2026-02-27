@@ -5,21 +5,19 @@ import com.gemmap.gemmap.shared.exception.CommonException;
 import com.gemmap.gemmap.image.domain.repository.ImageRepository;
 import com.gemmap.gemmap.shared.config.s3.S3Properties;
 import com.gemmap.gemmap.shared.exception.ErrorCode;
-import com.gemmap.gemmap.image.infrastructure.objectstorage.ObjectStorageService;
-import com.gemmap.gemmap.image.infrastructure.objectstorage.S3UrlGenerator;
+import com.gemmap.gemmap.shared.infrastructure.objectstorage.ObjectStorageService;
+import com.gemmap.gemmap.shared.infrastructure.objectstorage.S3UrlGenerator;
+import com.gemmap.gemmap.shared.util.S3FileUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
-import java.io.IOException;
-import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
 import java.util.List;
-import java.util.UUID;
 
 @Slf4j
 @Service
@@ -30,6 +28,9 @@ public class ImageService {
     private final ObjectStorageService objectStorageService;
     private final S3Properties s3Properties;
     private final S3UrlGenerator s3UrlGenerator;
+
+    @Value("${s3.spot-base-path}")
+    private String spotBasePath;
 
     private static final List<String> ALLOWED_MIME_TYPES = List.of("image/jpeg", "image/png", "image/webp");
     private static final long MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
@@ -46,7 +47,7 @@ public class ImageService {
     private Image uploadSingleImage(MultipartFile file) {
         validate(file);
 
-        String key = generateKey(file.getOriginalFilename());
+        String key = S3FileUtils.buildKey(spotBasePath, file.getOriginalFilename());
 
         // 1. Object Storage에 업로드
         objectStorageService.upload(s3Properties.getBucket(), key, file);
@@ -101,20 +102,6 @@ public class ImageService {
         if (file.getSize() > MAX_FILE_SIZE) {
             throw new CommonException(ErrorCode.FILE_SIZE_EXCEEDED, "파일 크기가 10MB를 초과할 수 없습니다.");
         }
-    }
-
-    private String generateKey(String originalFilename) {
-        String extension = "";
-        if (originalFilename != null && originalFilename.contains(".")) {
-            extension = originalFilename.substring(originalFilename.lastIndexOf("."));
-        }
-
-        LocalDate now = LocalDate.now();
-        String datePath = now.format(DateTimeFormatter.ofPattern("yyyy/MM"));
-        String uuid = UUID.randomUUID().toString();
-
-        // 키 규칙: {basePath}/{yyyy}/{MM}/{uuid}.{ext}
-        return s3Properties.getBasePath() + datePath + "/" + uuid + extension;
     }
 
     /**

@@ -42,7 +42,8 @@ public class Constant {
             "/api/v1/users/**",
             "/api/v1/spots/**",
             "/api/v1/markers/**",
-            "/api/v1/bookmarks/**"
+            "/api/v1/bookmarks/**",
+            "/api/v1/checkins/**"
     };
 
     // 관리자만 접근 가능한 경로
