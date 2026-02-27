@@ -1,18 +1,16 @@
 package com.gemmap.gemmap.auth.application.service;
 
 import com.gemmap.gemmap.auth.application.dto.kakao.KakaoAccessTokenInfoResponse;
-import com.gemmap.gemmap.auth.application.dto.kakao.KakaoTokenResponse;
 import com.gemmap.gemmap.auth.application.dto.kakao.KakaoUserInfoResponse;
 import com.gemmap.gemmap.auth.application.dto.response.KakaoLoginResponseDto;
-import com.gemmap.gemmap.auth.application.dto.response.KakaoTokenRefreshResponseDto;
 import com.gemmap.gemmap.auth.application.dto.response.RegisterResponseDto;
 import com.gemmap.gemmap.auth.domain.entity.User;
 import com.gemmap.gemmap.auth.domain.repository.UserRepository;
 import com.gemmap.gemmap.auth.infrastructure.jwt.JwtTokenDto;
 import com.gemmap.gemmap.auth.infrastructure.jwt.JwtUtil;
 import com.gemmap.gemmap.auth.infrastructure.oauth.KakaoOAuth2Service;
-import com.gemmap.gemmap.image.infrastructure.objectstorage.ObjectStorageService;
-import com.gemmap.gemmap.image.infrastructure.objectstorage.S3UrlGenerator;
+import com.gemmap.gemmap.shared.infrastructure.objectstorage.ObjectStorageService;
+import com.gemmap.gemmap.shared.infrastructure.objectstorage.S3UrlGenerator;
 import com.gemmap.gemmap.shared.common.constants.Constant;
 import com.gemmap.gemmap.shared.common.enums.EProvider;
 import com.gemmap.gemmap.shared.common.enums.ERole;

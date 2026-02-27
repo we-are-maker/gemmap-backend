@@ -33,7 +33,8 @@ logging:
 
 # OCI Object Storage 설정 (S3 호환)
 s3:
-  base-path: dev/spots/
+  spot-base-path: dev/spots/
+  checkin-base-path: dev/checkins/
 
 # Dev 환경 설정
 cors:

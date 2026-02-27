@@ -39,4 +39,5 @@ jwt:
 
 # OCI Object Storage 설정 (S3 호환)
 s3:
-  base-path: local/spots/
+  spot-base-path: local/spots/
+  checkin-base-path: local/checkins/

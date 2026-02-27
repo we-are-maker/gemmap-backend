@@ -3,16 +3,18 @@ package com.gemmap.gemmap.spot.application.service;
 import com.gemmap.gemmap.auth.domain.entity.User;
 import com.gemmap.gemmap.auth.domain.repository.UserRepository;
 import com.gemmap.gemmap.bookmark.application.service.BookmarkService;
-import com.gemmap.gemmap.image.infrastructure.objectstorage.ObjectStorageService;
-import com.gemmap.gemmap.image.infrastructure.objectstorage.S3UrlGenerator;
 import com.gemmap.gemmap.checkin.application.service.CheckinService;
 import com.gemmap.gemmap.checkin.domain.repository.SpotCheckinRepository;
 import com.gemmap.gemmap.shared.common.enums.ERecommendationLevel;
+import com.gemmap.gemmap.shared.infrastructure.objectstorage.ObjectStorageService;
+import com.gemmap.gemmap.shared.infrastructure.objectstorage.S3UrlGenerator;
 import com.gemmap.gemmap.shared.common.enums.EAttractionLevel;
 import com.gemmap.gemmap.shared.common.enums.ESpotPhotoType;
 import com.gemmap.gemmap.shared.config.s3.S3Properties;
 import com.gemmap.gemmap.shared.exception.CommonException;
 import com.gemmap.gemmap.shared.exception.ErrorCode;
+import com.gemmap.gemmap.shared.util.DateTimeUtils;
+import com.gemmap.gemmap.shared.util.S3FileUtils;
 import com.gemmap.gemmap.shared.util.SpatialUtils;
 import com.gemmap.gemmap.spot.application.dto.request.SpotCreateRequest;
 import com.gemmap.gemmap.spot.application.dto.response.*;
@@ -29,22 +31,12 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.math.BigDecimal;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.OffsetDateTime;
-import java.time.ZoneId;
-import java.time.format.DateTimeFormatter;
-import java.time.format.DateTimeParseException;
 import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class SpotService {
-
-    private static final ZoneId KST = ZoneId.of("Asia/Seoul");
 
     private final BookmarkService bookmarkService;
     private final CheckinService checkinService;
@@ -56,8 +48,8 @@ public class SpotService {
     private final S3Properties s3Properties;
     private final SpotFileValidator spotFileValidator;
 
-    @Value("${s3.base-path}")
-    private String basePath;
+    @Value("${s3.spot-base-path}")
+    private String spotBasePath;
 
     /**
      * 스팟 생성
@@ -78,7 +70,7 @@ public class SpotService {
         spotFileValidator.validateImage(file);
 
         // 3) 업로드 (키 규칙 예: spots/yyyy/MM/uuid.ext)
-        String key = buildSpotKey(file.getOriginalFilename());
+        String key = S3FileUtils.buildKey(spotBasePath, file.getOriginalFilename());
         String fileUrl;
         try {
             // 기존 ObjectStorageService 사용
@@ -111,7 +103,7 @@ public class SpotService {
                 .user(user)
                 .fileUrl(fileUrl)
                 .type(ESpotPhotoType.SPOT)
-                .takenAt(parseTakenAt(req.takenAt()))
+                .takenAt(DateTimeUtils.parseTakenAt(req.takenAt()))
                 .latitude(req.latitude())
                 .longitude(req.longitude())
                 .location(SpatialUtils.createPoint(req.longitude(), req.latitude()))
@@ -131,7 +123,7 @@ public class SpotService {
                 .build();
         } catch (RuntimeException ex) {
             // 보상 트랜잭션: DB 저장 실패 시 업로드된 S3 객체 삭제
-            safeDeleteObject(key);
+            S3FileUtils.safeDelete(objectStorageService, s3Properties, key);
             throw ex;
         }
     }
@@ -144,99 +136,6 @@ public class SpotService {
         if (lon != null && (lon.compareTo(BigDecimal.valueOf(-180)) < 0
                 || lon.compareTo(BigDecimal.valueOf(180)) > 0)) {
             throw new CommonException(ErrorCode.INVALID_INPUT_VALUE, "경도는 -180~180 범위여야 합니다.");
-        }
-    }
-
-    /**
-     * 촬영 시각 문자열을 LocalDateTime(KST)으로 파싱
-     *
-     * <p>타임존 오프셋이 포함된 ISO 8601 형식을 권장합니다.</p>
-     *
-     * <h3>지원 형식 (우선순위 순):</h3>
-     * <ol>
-     *   <li><b>오프셋 포함 (권장)</b>: "2025-11-01T14:51:24+09:00" → KST 변환하여 저장</li>
-     *   <li><b>UTC (Z suffix)</b>: "2025-11-01T05:51:24Z" → KST 변환하여 저장 (+9시간)</li>
-     *   <li><b>오프셋 없음 (Fallback)</b>: "2025-11-01T14:51:24" → KST로 가정하여 저장</li>
-     * </ol>
-     *
-     * <h3>클라이언트 구현 가이드:</h3>
-     * <ul>
-     *   <li>EXIF 촬영 시각 추출 시, 가능하면 OffsetTimeOriginal 태그를 함께 확인하세요.</li>
-     *   <li>타임존 정보가 있으면 ISO 8601 오프셋 형식으로 전송하세요. (예: +09:00, +01:00)</li>
-     *   <li>타임존 정보가 없으면 로컬 시간 그대로 전송하세요. (서버에서 KST로 가정 처리)</li>
-     * </ul>
-     *
-     * <h3>변환 예시:</h3>
-     * <pre>
-     * 입력: "2025-11-01T10:00:00+01:00" (파리, UTC+1)
-     * 절대 시간: 2025-11-01T09:00:00Z (UTC)
-     * KST 변환: 2025-11-01T18:00:00 (UTC+9)
-     * DB 저장: 2025-11-01 18:00:00
-     * </pre>
-     *
-     * @param takenAt ISO 8601 형식의 촬영 시각 문자열 (null 허용)
-     * @return KST 기준 LocalDateTime, 입력이 null/blank이면 null
-     * @throws CommonException takenAt 형식이 올바르지 않은 경우
-     */
-    private static LocalDateTime parseTakenAt(String takenAt) {
-        if (takenAt == null || takenAt.isBlank()) return null;
-
-        try {
-            // 1. 타임존/오프셋 정보가 포함된 경우: OffsetDateTime으로 파싱 후 KST 변환
-            if (hasTimezoneInfo(takenAt)) {
-                OffsetDateTime odt = OffsetDateTime.parse(takenAt, DateTimeFormatter.ISO_OFFSET_DATE_TIME);
-                // 절대 시간(Instant)은 유지하고 표기만 KST로 변환
-                return odt.atZoneSameInstant(KST).toLocalDateTime();
-            }
-
-            // 2. 타임존 정보가 없는 경우 (Fallback): KST로 가정하여 처리
-            // 주의: 해외에서 촬영한 사진의 경우 실제 시간과 다를 수 있음
-            log.debug("takenAt에 타임존 정보 없음. KST로 가정하여 처리: {}", takenAt);
-            return LocalDateTime.parse(takenAt, DateTimeFormatter.ISO_LOCAL_DATE_TIME);
-
-        } catch (DateTimeParseException e) {
-            throw new CommonException(ErrorCode.INVALID_INPUT_VALUE,
-                "takenAt 형식이 올바르지 않습니다. ISO 8601 형식을 사용하세요. " +
-                "(권장: 2025-11-01T14:51:24+09:00, 허용: 2025-11-01T14:51:24Z, 2025-11-01T14:51:24)");
-        }
-    }
-
-    /**
-     * 문자열에 타임존/오프셋 정보가 포함되어 있는지 확인
-     *
-     * @param dateTimeStr ISO 8601 형식의 날짜/시간 문자열
-     * @return 타임존 정보 포함 여부
-     */
-    private static boolean hasTimezoneInfo(String dateTimeStr) {
-        // Z (UTC), + (양수 오프셋), 또는 T 이후의 - (음수 오프셋) 확인
-        // 예: 2025-11-01T14:51:24Z, 2025-11-01T14:51:24+09:00, 2025-11-01T14:51:24-05:00
-        if (dateTimeStr.endsWith("Z")) return true;
-        if (dateTimeStr.contains("+")) return true;
-
-        // T 이후에 -가 있으면 오프셋 (날짜 부분의 -와 구분)
-        int tIndex = dateTimeStr.indexOf('T');
-        if (tIndex > 0) {
-            String timePart = dateTimeStr.substring(tIndex);
-            return timePart.contains("-");
-        }
-        return false;
-    }
-
-    private String buildSpotKey(String originalName) {
-        String ext = Optional.ofNullable(originalName)
-            .filter(n -> n.contains("."))
-            .map(n -> n.substring(n.lastIndexOf('.')))
-            .orElse(".jpg");
-        String ym = DateTimeFormatter.ofPattern("yyyy/MM").format(LocalDate.now(KST));
-        return basePath + ym + "/" + UUID.randomUUID() + ext;
-    }
-
-    private void safeDeleteObject(String key) {
-        try {
-            objectStorageService.delete(s3Properties.getBucket(), key);
-            log.info("Compensated: deleted S3 object {}", key);
-        } catch (Exception e) {
-            log.warn("Failed to delete S3 object {} during compensation", key, e);
         }
     }
 
@@ -272,21 +171,7 @@ public class SpotService {
 
         // 6) Object Storage 삭제 (트랜잭션 외부, 베스트 에포트)
         for (String fileUrl : fileUrls) {
-            safeDeleteObjectByUrl(fileUrl);
-        }
-    }
-
-    /**
-     * Object Storage 파일 삭제 (베스트 에포트, 실패 시 로그만)
-     */
-    private void safeDeleteObjectByUrl(String fileUrl) {
-        try {
-            String key = s3UrlGenerator.extractKeyFromUrl(fileUrl);
-            objectStorageService.delete(s3Properties.getBucket(), key);
-            log.info("Successfully deleted S3 object. URL: {}", fileUrl);
-        } catch (Exception e) {
-            // 스토리지 삭제 실패는 로그만 남기고 계속 진행 (비용 이슈지만 참조 깨짐 없음)
-            log.error("Failed to delete S3 object (best-effort). URL: {}", fileUrl, e);
+            S3FileUtils.safeDeleteByUrl(objectStorageService, s3Properties, s3UrlGenerator, fileUrl);
         }
     }
 

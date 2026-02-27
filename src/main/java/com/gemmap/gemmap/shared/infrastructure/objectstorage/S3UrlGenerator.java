@@ -1,4 +1,4 @@
-package com.gemmap.gemmap.image.infrastructure.objectstorage;
+package com.gemmap.gemmap.shared.infrastructure.objectstorage;
 
 import com.gemmap.gemmap.shared.config.s3.S3Properties;
 import lombok.RequiredArgsConstructor;
