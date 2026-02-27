@@ -2,6 +2,8 @@ package com.gemmap.gemmap.spot.presentation;
 
 import com.gemmap.gemmap.bookmark.application.dto.response.MyBookmarksResponse;
 import com.gemmap.gemmap.bookmark.application.service.BookmarkService;
+import com.gemmap.gemmap.checkin.application.dto.response.MyCheckinSpotsResponse;
+import com.gemmap.gemmap.checkin.application.service.CheckinService;
 import com.gemmap.gemmap.shared.common.annotation.UserId;
 import com.gemmap.gemmap.spot.application.dto.request.SpotCreateRequest;
 import com.gemmap.gemmap.spot.application.dto.response.*;
@@ -23,6 +25,7 @@ public class SpotController {
 
     private final SpotService spotService;
     private final BookmarkService bookmarkService;
+    private final CheckinService checkinService;
 
     /**
      * 스팟 생성
@@ -108,6 +111,16 @@ public class SpotController {
             @UserId Long userId
     ) {
         return ResponseEntity.ok(bookmarkService.getMyBookmarkedSpots(userId));
+    }
+
+    /**
+     * 체크인 젬 목록 조회 (마이스팟)
+     */
+    @GetMapping("/me/checked")
+    public ResponseEntity<MyCheckinSpotsResponse> getMyCheckinSpots(
+            @UserId Long userId
+    ) {
+        return ResponseEntity.ok(checkinService.getMyCheckinSpots(userId));
     }
 
     /**

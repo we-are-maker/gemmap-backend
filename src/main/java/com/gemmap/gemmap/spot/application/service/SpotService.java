@@ -5,6 +5,9 @@ import com.gemmap.gemmap.auth.domain.repository.UserRepository;
 import com.gemmap.gemmap.bookmark.application.service.BookmarkService;
 import com.gemmap.gemmap.image.infrastructure.objectstorage.ObjectStorageService;
 import com.gemmap.gemmap.image.infrastructure.objectstorage.S3UrlGenerator;
+import com.gemmap.gemmap.checkin.application.service.CheckinService;
+import com.gemmap.gemmap.checkin.domain.repository.SpotCheckinRepository;
+import com.gemmap.gemmap.shared.common.enums.ERecommendationLevel;
 import com.gemmap.gemmap.shared.common.enums.EAttractionLevel;
 import com.gemmap.gemmap.shared.common.enums.ESpotPhotoType;
 import com.gemmap.gemmap.shared.config.s3.S3Properties;
@@ -44,6 +47,7 @@ public class SpotService {
     private static final ZoneId KST = ZoneId.of("Asia/Seoul");
 
     private final BookmarkService bookmarkService;
+    private final CheckinService checkinService;
     private final SpotRepository spotRepository;
     private final UserRepository userRepository;
     private final SpotPhotoRepository spotPhotoRepository;
@@ -79,7 +83,6 @@ public class SpotService {
         try {
             // 기존 ObjectStorageService 사용
             objectStorageService.upload(s3Properties.getBucket(), key, file);
-            // URL 생성 (NHN Cloud 형식)
             fileUrl = s3UrlGenerator.generateUrl(key);
         } catch (Exception e) {
             log.error("S3 upload failed for key: {}", key, e);
@@ -313,14 +316,21 @@ public class SpotService {
                 findFirstBySpotAndTypeOrderByCreatedAtDesc(spot, ESpotPhotoType.SPOT)
                 .orElseThrow(() -> new CommonException(ErrorCode.SPOT_PHOTO_NOT_FOUND, "스팟 사진이 존재하지 않습니다."));
 
-        // 5) 끌림지수(나의 평가) 조회 - 찜하기 하지 않은 경우 null
-        EAttractionLevel attractionLevel = bookmarkService.getAttractionLevel(userId, spotId);
-
-        // 6) 이 스팟(젬)을 찜한 총 개수 조회
+        // 5) 이 스팟(젬)을 찜한 총 개수 조회
         Integer bookmarkedCount = bookmarkService.getBookmarkedCountBySpot(spotId);
 
-        // 7) 응답 DTO 변환
-        return SpotDetailResponse.from(spot, spotOwner, representativePhoto, bookmarkedCount, attractionLevel);
+        // 6) 끌림지수(나의 평가) 조회 - 찜하기 하지 않은 경우 null
+        EAttractionLevel attractionLevel = bookmarkService.getAttractionLevel(userId, spotId);
+
+        // 7) 이 스팟(젬)을 체크인한 총 개수 조회
+        Integer checkedInCount = checkinService.getCheckinCountBySpot(spotId);
+
+        // 8) 추천지수(나의 평가) 조회 - 체크인 하지 않은 경우 null
+        ERecommendationLevel recommendationLevel = checkinService.getRecommendationLevel(userId, spotId);
+
+        // 9) 응답 DTO 변환
+        return SpotDetailResponse.from(spot, spotOwner, representativePhoto,
+                bookmarkedCount, checkedInCount, attractionLevel, recommendationLevel);
     }
 
     /**
@@ -336,8 +346,10 @@ public class SpotService {
         Integer createdCount = spotRepository.countByUser(user);
         // 찜한 젬 개수
         Integer bookmarkedCount = bookmarkService.getBookmarkedCount(userId);
+        // 체크인한 젬 개수
+        Integer checkedInCount = checkinService.getCheckinCount(userId);
 
-        return MySpotsResponse.of(user, createdCount, bookmarkedCount);
+        return MySpotsResponse.of(user, createdCount, bookmarkedCount, checkedInCount);
     }
 
     /**
@@ -365,7 +377,6 @@ public class SpotService {
 
         return MyCreatedSpotsResponse.of(spotSummaries);
     }
-
 
     /**
      * 지도 전체 마커 조회
