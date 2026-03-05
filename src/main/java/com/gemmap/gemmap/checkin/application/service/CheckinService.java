@@ -62,13 +62,13 @@ public class CheckinService {
      * 위치 검증은 프론트엔드에서 수행. 백엔드는 좌표를 수신하여 spot_photos에 저장만 함.
      */
     @Transactional
-    public CheckinCreateResponse createCheckin(Long userId, CheckinCreateRequest req, MultipartFile file) {
+    public CheckinCreateResponse createCheckin(Long userId, Long spotId, CheckinCreateRequest req, MultipartFile file) {
         // 1) 사용자 조회
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new CommonException(ErrorCode.USER_NOT_FOUND));
 
         // 2) 스팟 조회
-        Spot spot = spotRepository.findById(req.spotId())
+        Spot spot = spotRepository.findById(spotId)
                 .orElseThrow(() -> new CommonException(ErrorCode.SPOT_NOT_FOUND));
 
         // 3) 중복 체크인 확인

@@ -15,7 +15,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.math.BigDecimal;
 
 @RestController
-@RequestMapping("/api/v1/checkins")
+@RequestMapping("/api/v1/spots/{spotId}/checkins")
 @RequiredArgsConstructor
 public class CheckinController {
 
@@ -23,12 +23,12 @@ public class CheckinController {
 
     /**
      * 젬 획득하기 (체크인)
-     * POST /api/v1/checkins
+     * POST /api/v1/spots/{spotId}/checkins
      */
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<CheckinCreateResponse> createCheckin(
             @UserId Long userId,
-            @RequestParam Long spotId,
+            @PathVariable Long spotId,
             @RequestParam MultipartFile file,
             @RequestParam ERecommendationLevel recommendationLevel,
             @RequestParam(required = false) String takenAt,
@@ -42,18 +42,18 @@ public class CheckinController {
             @RequestParam(required = false) BigDecimal focalLength
     ) {
         CheckinCreateRequest request = new CheckinCreateRequest(
-                spotId, recommendationLevel, takenAt, latitude, longitude,
+                recommendationLevel, takenAt, latitude, longitude,
                 cameraMake, cameraModel, aperture, shutterSpeed, iso, focalLength
         );
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(checkinService.createCheckin(userId, request, file));
+                .body(checkinService.createCheckin(userId, spotId, request, file));
     }
 
     /**
      * 체크인 취소
-     * DELETE /api/v1/checkins/{spotId}
+     * DELETE /api/v1/spots/{spotId}/checkins
      */
-    @DeleteMapping("/{spotId}")
+    @DeleteMapping
     public ResponseEntity<Void> deleteCheckin(
             @UserId Long userId,
             @PathVariable Long spotId

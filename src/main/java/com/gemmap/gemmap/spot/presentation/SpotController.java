@@ -62,11 +62,12 @@ public class SpotController {
 
     /**
      * 스팟 삭제
+     * DELETE /api/v1/spots/{spotId}
      */
-    @DeleteMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @DeleteMapping("/{spotId}")
     public ResponseEntity<Void> delete(
             @UserId Long userId,
-            @RequestParam Long spotId
+            @PathVariable Long spotId
     ) {
         spotService.delete(userId, spotId);
         return ResponseEntity.noContent().build();

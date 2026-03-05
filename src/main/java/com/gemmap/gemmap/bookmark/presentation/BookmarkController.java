@@ -6,12 +6,11 @@ import com.gemmap.gemmap.shared.common.annotation.UserId;
 import com.gemmap.gemmap.shared.common.enums.EAttractionLevel;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/api/v1/bookmarks")
+@RequestMapping("/api/v1/spots/{spotId}/bookmarks")
 @RequiredArgsConstructor
 public class BookmarkController {
 
@@ -19,11 +18,12 @@ public class BookmarkController {
 
     /**
      * 젬 찜하기
+     * POST /api/v1/spots/{spotId}/bookmarks
      */
-    @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PostMapping
     public ResponseEntity<BookmarkCreateResponse> createBookmark(
             @UserId Long userId,
-            @RequestParam Long spotId,
+            @PathVariable Long spotId,
             @RequestParam EAttractionLevel attractionLevel
     ){
         return ResponseEntity.status(HttpStatus.CREATED)
@@ -32,8 +32,9 @@ public class BookmarkController {
 
     /**
      * 찜하기 취소
+     * DELETE /api/v1/spots/{spotId}/bookmarks
      */
-    @DeleteMapping("/{spotId}")
+    @DeleteMapping
     public ResponseEntity<Void> deleteBookmark(
             @UserId Long userId,
             @PathVariable Long spotId
