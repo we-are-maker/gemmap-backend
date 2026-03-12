@@ -97,6 +97,7 @@ class SpotServiceTest {
 
     private void mockUserFound() {
         given(userRepository.findById(TEST_USER_ID)).willReturn(Optional.of(testUser));
+        given(testUser.hasPhotoConsentAgreed()).willReturn(true);
     }
 
     private void mockS3UploadSuccess() throws Exception {
