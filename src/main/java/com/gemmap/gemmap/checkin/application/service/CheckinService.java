@@ -56,8 +56,8 @@ public class CheckinService {
      * 젬 획득하기 (체크인)
      *
      * 처리 순서:
-     * 1) 사용자/스팟 조회 → 2) 중복 확인 → 3) 파일 검증
-     * → 4) S3 업로드 → 5) spot_photos 저장 → 6) spot_checkins 저장 → 7) 응답
+     * 1) 사용자 조회 → 2) 동의 확인 → 3) 스팟 조회 → 4) 중복 확인 → 5) 파일 검증
+     * → 6) S3 업로드 → 7) spot_photos 저장 → 8) spot_checkins 저장 → 9) 응답
      *
      * 위치 검증은 프론트엔드에서 수행. 백엔드는 좌표를 수신하여 spot_photos에 저장만 함.
      */
@@ -67,19 +67,24 @@ public class CheckinService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new CommonException(ErrorCode.USER_NOT_FOUND));
 
-        // 2) 스팟 조회
+        // 2) 사진 정보 활용 동의 확인
+        if (!user.hasPhotoConsentAgreed()) {
+            throw new CommonException(ErrorCode.PHOTO_CONSENT_REQUIRED);
+        }
+
+        // 3) 스팟 조회
         Spot spot = spotRepository.findById(spotId)
                 .orElseThrow(() -> new CommonException(ErrorCode.SPOT_NOT_FOUND));
 
-        // 3) 중복 체크인 확인
+        // 4) 중복 체크인 확인
         if (spotCheckinRepository.existsByUserAndSpot(user, spot)) {
             throw new CommonException(ErrorCode.CHECKIN_ALREADY_EXISTS);
         }
 
-        // 4) 파일 검증
+        // 5) 파일 검증
         spotFileValidator.validateImage(file);
 
-        // 5) S3 업로드 (키 규칙 예: spots/yyyy/MM/uuid.ext)
+        // 6) S3 업로드 (키 규칙 예: spots/yyyy/MM/uuid.ext)
         String key = S3FileUtils.buildKey(checkinBasePath, file.getOriginalFilename());
         String fileUrl;
         try {
@@ -93,7 +98,7 @@ public class CheckinService {
         }
 
         try {
-            // 6) spot_photos 저장
+            // 7) spot_photos 저장
             SpotPhoto photo = SpotPhoto.builder()
                     .spot(spot)
                     .user(user)
@@ -112,7 +117,7 @@ public class CheckinService {
                     .build();
             spotPhotoRepository.save(photo);
 
-            // 7) spot_checkins 저장 (photo_id FK 연결)
+            // 8) spot_checkins 저장 (photo_id FK 연결)
             SpotCheckin checkin = SpotCheckin.builder()
                     .user(user)
                     .spot(spot)
@@ -121,7 +126,7 @@ public class CheckinService {
                     .build();
             spotCheckinRepository.save(checkin);
 
-            // 8) 응답
+            // 9) 응답
             return CheckinCreateResponse.of(checkin, fileUrl);
         } catch (RuntimeException ex) {
             // 보상 트랜잭션: DB 저장 실패 시 업로드된 S3 객체 삭제

@@ -65,11 +65,16 @@ public class SpotService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new CommonException(ErrorCode.USER_NOT_FOUND));
 
-        // 2) 요청 검증 (빠른 실패 우선: 좌표 검증 -> 파일 검증)
+        // 2) 사진 정보 활용 동의 확인
+        if (!user.hasPhotoConsentAgreed()) {
+            throw new CommonException(ErrorCode.PHOTO_CONSENT_REQUIRED);
+        }
+
+        // 3) 요청 검증 (빠른 실패 우선: 좌표 검증 -> 파일 검증)
         validateCoordinates(req.latitude(), req.longitude());
         spotFileValidator.validateImage(file);
 
-        // 3) 업로드 (키 규칙 예: spots/yyyy/MM/uuid.ext)
+        // 4) 업로드 (키 규칙 예: spots/yyyy/MM/uuid.ext)
         String key = S3FileUtils.buildKey(spotBasePath, file.getOriginalFilename());
         String fileUrl;
         try {
@@ -82,7 +87,7 @@ public class SpotService {
         }
 
         try {
-            // 4) spots 저장
+            // 5) spots 저장
             Spot spot = spotRepository.save(
                 Spot.builder()
                     .user(user)
@@ -97,7 +102,7 @@ public class SpotService {
                     .build()
             );
 
-            // 5) spot_photos 저장 (type=SPOT, fileUrl 직접 저장, user 저장)
+            // 6) spot_photos 저장 (type=SPOT, fileUrl 직접 저장, user 저장)
             SpotPhoto photo = SpotPhoto.builder()
                 .spot(spot)
                 .user(user)
@@ -116,7 +121,7 @@ public class SpotService {
                 .build();
             spotPhotoRepository.save(photo);
 
-            // 6) 응답
+            // 7) 응답
             return SpotCreateResponse.builder()
                 .spotId(spot.getId())
                 .fileUrl(fileUrl)

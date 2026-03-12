@@ -3,6 +3,7 @@ package com.gemmap.gemmap.auth.application.service;
 import com.gemmap.gemmap.auth.application.dto.kakao.KakaoAccessTokenInfoResponse;
 import com.gemmap.gemmap.auth.application.dto.kakao.KakaoUserInfoResponse;
 import com.gemmap.gemmap.auth.application.dto.response.KakaoLoginResponseDto;
+import com.gemmap.gemmap.auth.application.dto.response.PhotoConsentResponse;
 import com.gemmap.gemmap.auth.application.dto.response.RegisterResponseDto;
 import com.gemmap.gemmap.auth.domain.entity.User;
 import com.gemmap.gemmap.auth.domain.repository.UserRepository;
@@ -17,10 +18,10 @@ import com.gemmap.gemmap.shared.common.enums.ERole;
 import com.gemmap.gemmap.shared.config.s3.S3Properties;
 import com.gemmap.gemmap.shared.exception.CommonException;
 import com.gemmap.gemmap.shared.exception.ErrorCode;
-import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDate;
@@ -497,5 +498,33 @@ public class AuthService {
             log.error("로그아웃 처리 중 예상치 못한 오류: {}", e.getMessage(), e);
             throw new CommonException(ErrorCode.INTERNAL_SERVER_ERROR);
         }
+    }
+
+    /**
+     * 사진 정보 활용 동의 처리 (멱등)
+     * - 미동의 → 동의 처리 후 true 반환
+     * - 기동의 → 추가 처리 없이 true 반환 (409 아님)
+     */
+    @Transactional
+    public PhotoConsentResponse agreeToPhotoConsent(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new CommonException(ErrorCode.USER_NOT_FOUND));
+
+        if (!user.hasPhotoConsentAgreed()) {
+            user.agreeToPhotoConsent();
+        }
+
+        return PhotoConsentResponse.of(user.hasPhotoConsentAgreed());
+    }
+
+    /**
+     * 사진 정보 활용 동의 상태 조회
+     */
+    @Transactional(readOnly = true)
+    public PhotoConsentResponse getPhotoConsentStatus(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new CommonException(ErrorCode.USER_NOT_FOUND));
+
+        return PhotoConsentResponse.of(user.hasPhotoConsentAgreed());
     }
 }
