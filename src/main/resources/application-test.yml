@@ -43,3 +43,5 @@ s3:
     name: "kr-1"
   bucket: "test-bucket"
   base-path: "test/"
+  spot-base-path: "test/spots/"
+  checkin-base-path: "test/checkins/"

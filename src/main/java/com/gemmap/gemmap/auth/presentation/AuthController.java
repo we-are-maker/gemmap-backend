@@ -1,6 +1,7 @@
 package com.gemmap.gemmap.auth.presentation;
 
 import com.gemmap.gemmap.auth.application.dto.response.KakaoLoginResponseDto;
+import com.gemmap.gemmap.auth.application.dto.response.PhotoConsentResponse;
 import com.gemmap.gemmap.auth.application.dto.response.RegisterResponseDto;
 import com.gemmap.gemmap.auth.application.service.AuthService;
 import com.gemmap.gemmap.shared.common.annotation.UserId;
@@ -85,5 +86,23 @@ public class AuthController {
 
         authService.logout(userId);
         return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * 사진 정보 활용 동의 처리
+     * POST /api/v1/auth/photo-consent
+     */
+    @PostMapping("/photo-consent")
+    public ResponseEntity<PhotoConsentResponse> agreeToPhotoConsent(@UserId Long userId) {
+        return ResponseEntity.ok(authService.agreeToPhotoConsent(userId));
+    }
+
+    /**
+     * 사진 정보 활용 동의 상태 조회
+     * GET /api/v1/auth/photo-consent
+     */
+    @GetMapping("/photo-consent")
+    public ResponseEntity<PhotoConsentResponse> getPhotoConsentStatus(@UserId Long userId) {
+        return ResponseEntity.ok(authService.getPhotoConsentStatus(userId));
     }
 }

@@ -32,6 +32,7 @@ public enum ErrorCode {
     // 403 Forbidden
     ACCESS_DENIED(40300, HttpStatus.FORBIDDEN, "접근 권한이 없습니다."),
     INVALID_ROLE(40301, HttpStatus.FORBIDDEN, "요청한 리소스에 접근할 수 있는 권한이 없습니다."),
+    PHOTO_CONSENT_REQUIRED(40302, HttpStatus.FORBIDDEN, "사진 정보 활용 동의가 필요합니다."),
 
     // 405 Method Not Allowed
     METHOD_NOT_ALLOWED(40500, HttpStatus.METHOD_NOT_ALLOWED, "허용되지 않은 HTTP 메서드입니다."),

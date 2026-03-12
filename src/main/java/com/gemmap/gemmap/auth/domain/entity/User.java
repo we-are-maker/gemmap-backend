@@ -13,6 +13,7 @@ import org.hibernate.annotations.DynamicUpdate;
 import org.hibernate.annotations.SQLDelete;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.ZoneId;
 
 /**
@@ -62,6 +63,9 @@ public class User {
 
     @Column(name = "delete_date")
     private LocalDate deleteDate;
+
+    @Column(name = "photo_consent_agreed_at")
+    private LocalDateTime photoConsentAgreedAt;
 
     /* User Info */
 
@@ -166,5 +170,13 @@ public class User {
     public void recoverUser() {
         this.isDeleted = false;
         this.deleteDate = null;
+    }
+
+    public void agreeToPhotoConsent() {
+        this.photoConsentAgreedAt = LocalDateTime.now(KST);
+    }
+
+    public boolean hasPhotoConsentAgreed() {
+        return this.photoConsentAgreedAt != null;
     }
 }
