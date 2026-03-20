@@ -64,12 +64,12 @@ src/main/resources/certs
 
 # Claude Code
 .claude/
+CLAUDE.md
 
 # Cursor
 .cursor/
 
-# Agent
-.agents/
+# AI Agent Rules
 AGENTS.md
 
 package-lock.json
