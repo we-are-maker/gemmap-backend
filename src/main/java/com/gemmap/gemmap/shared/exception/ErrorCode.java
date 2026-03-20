@@ -33,6 +33,7 @@ public enum ErrorCode {
     ACCESS_DENIED(40300, HttpStatus.FORBIDDEN, "접근 권한이 없습니다."),
     INVALID_ROLE(40301, HttpStatus.FORBIDDEN, "요청한 리소스에 접근할 수 있는 권한이 없습니다."),
     PHOTO_CONSENT_REQUIRED(40302, HttpStatus.FORBIDDEN, "사진 정보 활용 동의가 필요합니다."),
+    CANNOT_REPORT_OWN_SPOT(40303, HttpStatus.FORBIDDEN, "본인의 젬은 신고할 수 없습니다."),
 
     // 405 Method Not Allowed
     METHOD_NOT_ALLOWED(40500, HttpStatus.METHOD_NOT_ALLOWED, "허용되지 않은 HTTP 메서드입니다."),
@@ -54,6 +55,7 @@ public enum ErrorCode {
     ALREADY_REGISTERED_USER(40902, HttpStatus.CONFLICT, "이미 회원가입이 완료된 사용자입니다."),
     BOOKMARK_ALREADY_EXISTS(40903, HttpStatus.CONFLICT, "이미 찜한 젬입니다."),
     CHECKIN_ALREADY_EXISTS(40904, HttpStatus.CONFLICT, "이미 체크인한 젬입니다."),
+    REPORT_ALREADY_EXISTS(40905, HttpStatus.CONFLICT, "이미 신고한 젬입니다."),
 
     // 500 Internal Server Error
     INTERNAL_SERVER_ERROR(50000, HttpStatus.INTERNAL_SERVER_ERROR, "서버 내부 오류입니다."),
@@ -69,6 +71,7 @@ public enum ErrorCode {
     FILE_UPLOAD_FAILED(50020, HttpStatus.INTERNAL_SERVER_ERROR, "파일 업로드에 실패했습니다."),
     INVALID_FILE_FORMAT(40010, HttpStatus.BAD_REQUEST, "지원하지 않는 파일 형식입니다."),
     FILE_SIZE_EXCEEDED(40011, HttpStatus.BAD_REQUEST, "파일 크기가 너무 큽니다."),
+    REPORT_CONTENT_REQUIRED(40012, HttpStatus.BAD_REQUEST, "'기타' 사유 선택 시 신고 내용을 입력해야 합니다."),
 
     // OAuth2 관련 에러 (502 Bad Gateway - 외부 서비스 오류)
     KAKAO_TOKEN_REQUEST_FAILED(50201, HttpStatus.BAD_GATEWAY, "카카오 토큰 요청에 실패했습니다."),
