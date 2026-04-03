@@ -78,3 +78,7 @@ nul
 
 # Document
 docs
+
+# Postman
+.postman/
+postman/

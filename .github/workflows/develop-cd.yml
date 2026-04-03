@@ -97,6 +97,7 @@ jobs:
               -e KAKAO_CLIENT_SECRET='${{ secrets.KAKAO_CLIENT_SECRET }}' \
               -e KAKAO_REDIRECT_URI='${{ secrets.KAKAO_REDIRECT_URI }}' \
               -e KAKAO_APP_ID='${{ secrets.KAKAO_APP_ID }}' \
+              -e APPLE_BUNDLE_ID='${{ secrets.APPLE_BUNDLE_ID }}' \
               \
               -e S3_ENDPOINT='${{ secrets.S3_ENDPOINT }}' \
               -e S3_REGION='${{ secrets.S3_REGION }}' \
