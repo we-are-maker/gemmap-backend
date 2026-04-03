@@ -26,14 +26,22 @@ import java.time.ZoneId;
 @AllArgsConstructor(access = AccessLevel.PRIVATE)
 @DynamicUpdate
 @SQLDelete(sql = "UPDATE users SET is_deleted = true WHERE id = ?")
-@Table(name = "users")
+@Table(
+        name = "users",
+        uniqueConstraints = {
+                @UniqueConstraint(
+                        name = "uk_users_social_id_provider",
+                        columnNames = {"social_id", "provider"}
+                )
+        }
+)
 public class User {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "id", nullable = false, updatable = false, unique = true)
     private Long id;
 
-    @Column(name = "social_id", unique = true)
+    @Column(name = "social_id")
     private String socialId;
 
     @Column(name = "provider", nullable = false)

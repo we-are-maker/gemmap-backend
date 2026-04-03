@@ -1,23 +1,25 @@
 package com.gemmap.gemmap.auth.application.service;
 
+import com.gemmap.gemmap.auth.application.dto.apple.AppleIdentityTokenClaims;
 import com.gemmap.gemmap.auth.application.dto.kakao.KakaoAccessTokenInfoResponse;
 import com.gemmap.gemmap.auth.application.dto.kakao.KakaoUserInfoResponse;
-import com.gemmap.gemmap.auth.application.dto.response.KakaoLoginResponseDto;
 import com.gemmap.gemmap.auth.application.dto.response.PhotoConsentResponse;
 import com.gemmap.gemmap.auth.application.dto.response.RegisterResponseDto;
+import com.gemmap.gemmap.auth.application.dto.response.SocialLoginResponseDto;
 import com.gemmap.gemmap.auth.domain.entity.User;
 import com.gemmap.gemmap.auth.domain.repository.UserRepository;
 import com.gemmap.gemmap.auth.infrastructure.jwt.JwtTokenDto;
 import com.gemmap.gemmap.auth.infrastructure.jwt.JwtUtil;
+import com.gemmap.gemmap.auth.infrastructure.oauth.AppleOAuth2Service;
 import com.gemmap.gemmap.auth.infrastructure.oauth.KakaoOAuth2Service;
-import com.gemmap.gemmap.shared.infrastructure.objectstorage.ObjectStorageService;
-import com.gemmap.gemmap.shared.infrastructure.objectstorage.S3UrlGenerator;
 import com.gemmap.gemmap.shared.common.constants.Constant;
 import com.gemmap.gemmap.shared.common.enums.EProvider;
 import com.gemmap.gemmap.shared.common.enums.ERole;
 import com.gemmap.gemmap.shared.config.s3.S3Properties;
 import com.gemmap.gemmap.shared.exception.CommonException;
 import com.gemmap.gemmap.shared.exception.ErrorCode;
+import com.gemmap.gemmap.shared.infrastructure.objectstorage.ObjectStorageService;
+import com.gemmap.gemmap.shared.infrastructure.objectstorage.S3UrlGenerator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -34,7 +36,7 @@ import java.util.UUID;
  * 인증 관련 비즈니스 로직을 처리하는 서비스 클래스
  *
  * 주요 기능:
- * - 소셜 로그인 (Kakao)
+ * - 소셜 로그인 (Kakao, Apple)
  * - 회원가입 (GUEST → USER 권한 전환)
  * - 토큰 갱신 (Access Token + Refresh Token Rotation)
  * - 로그아웃
@@ -49,6 +51,8 @@ public class AuthService {
     private final UserRepository userRepository;
     private final JwtUtil jwtUtil;
     private final KakaoOAuth2Service kakaoOAuth2Service;
+    private final AppleOAuth2Service appleOAuth2Service;
+    private final AppleLoginTransactionService appleLoginTransactionService;
     private final ObjectStorageService objectStorageService;
     private final S3UrlGenerator s3UrlGenerator;
     private final S3Properties s3Properties;
@@ -58,7 +62,7 @@ public class AuthService {
      * 모바일 앱에서 획득한 카카오 Access Token을 검증하고 서비스 JWT 발급
      */
     @Transactional
-    public KakaoLoginResponseDto authenticateWithKakaoAccessToken(String kakaoAccessToken) {
+    public SocialLoginResponseDto authenticateWithKakaoAccessToken(String kakaoAccessToken) {
         if (kakaoAccessToken == null || kakaoAccessToken.trim().isEmpty()) {
             throw new CommonException(ErrorCode.INVALID_INPUT_VALUE);
         }
@@ -87,7 +91,7 @@ public class AuthService {
 
             log.info("카카오 SDK 로그인 성공 - 사용자 ID: {}, 권한: {}", user.getId(), user.getRole());
 
-            return KakaoLoginResponseDto.of(
+            return SocialLoginResponseDto.of(
                     user.getId(),
                     user.getRole(),
                     jwtTokenDto.getAccessToken(),
@@ -98,6 +102,31 @@ public class AuthService {
             throw e;
         } catch (Exception e) {
             log.error("카카오 SDK 로그인 처리 중 예상치 못한 오류: {}", e.getMessage(), e);
+            throw new CommonException(ErrorCode.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    /**
+     * Apple Identity Token으로 인증 (모바일 SDK 방식)
+     * 외부 Apple 토큰 검증은 트랜잭션 밖에서 수행하고,
+     * DB 작업은 AppleLoginTransactionService로 위임한다.
+     */
+    public SocialLoginResponseDto authenticateWithAppleToken(String identityToken, String name) {
+        if (identityToken == null || identityToken.trim().isEmpty()) {
+            throw new CommonException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+
+        try {
+            AppleIdentityTokenClaims claims = appleOAuth2Service.validateAndExtractClaims(identityToken);
+            return appleLoginTransactionService.completeAppleLogin(
+                    claims.sub(),
+                    claims.email(),
+                    name
+            );
+        } catch (CommonException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("Apple 로그인 처리 중 예상치 못한 오류: {}", e.getMessage(), e);
             throw new CommonException(ErrorCode.INTERNAL_SERVER_ERROR);
         }
     }
@@ -428,7 +457,7 @@ public class AuthService {
      * 액세스 토큰 갱신
      */
     @Transactional
-    public KakaoLoginResponseDto refreshAccessToken(String refreshToken) {
+    public SocialLoginResponseDto refreshAccessToken(String refreshToken) {
         try {
             // Refresh Token 유효성 검증
             if (!jwtUtil.validateToken(refreshToken)) {
@@ -463,7 +492,7 @@ public class AuthService {
             log.info("토큰 갱신 완료 - 사용자 ID: {}, Refresh Token 갱신: {}",
                     user.getId(), shouldRotateRefreshToken);
 
-            return KakaoLoginResponseDto.of(
+            return SocialLoginResponseDto.of(
                     user.getId(),
                     user.getRole(),
                     newAccessToken,

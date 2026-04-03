@@ -38,6 +38,8 @@ oauth2:
     client-secret: ${KAKAO_CLIENT_SECRET}
     redirect-uri: ${KAKAO_REDIRECT_URI}
     app-id: ${KAKAO_APP_ID}
+  apple:
+    bundle-id: ${APPLE_BUNDLE_ID}
 
 # OCI Object Storage 설정 (S3 호환)
 s3:
