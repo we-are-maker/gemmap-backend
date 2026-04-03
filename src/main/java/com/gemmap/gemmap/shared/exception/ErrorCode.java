@@ -72,6 +72,7 @@ public enum ErrorCode {
     INVALID_FILE_FORMAT(40010, HttpStatus.BAD_REQUEST, "지원하지 않는 파일 형식입니다."),
     FILE_SIZE_EXCEEDED(40011, HttpStatus.BAD_REQUEST, "파일 크기가 너무 큽니다."),
     REPORT_CONTENT_REQUIRED(40012, HttpStatus.BAD_REQUEST, "'기타' 사유 선택 시 신고 내용을 입력해야 합니다."),
+    APPLE_REQUIRED_USER_INFO_MISSING(40013, HttpStatus.BAD_REQUEST, "Apple 최초 로그인에 필요한 사용자 정보가 누락되었습니다."),
 
     // OAuth2 관련 에러 (502 Bad Gateway - 외부 서비스 오류)
     KAKAO_TOKEN_REQUEST_FAILED(50201, HttpStatus.BAD_GATEWAY, "카카오 토큰 요청에 실패했습니다."),

@@ -9,5 +9,6 @@ package com.gemmap.gemmap.shared.common.enums;
  * - 향후 추가 소셜 로그인 제공자 확장 가능
  */
 public enum EProvider {
-    KAKAO    // 카카오 소셜 로그인
+    KAKAO,   // 카카오 소셜 로그인
+    APPLE    // 애플 소셜 로그인
 }

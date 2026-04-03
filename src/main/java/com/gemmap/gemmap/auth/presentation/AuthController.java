@@ -1,8 +1,9 @@
 package com.gemmap.gemmap.auth.presentation;
 
-import com.gemmap.gemmap.auth.application.dto.response.KakaoLoginResponseDto;
+import com.gemmap.gemmap.auth.application.dto.request.AppleLoginRequestDto;
 import com.gemmap.gemmap.auth.application.dto.response.PhotoConsentResponse;
 import com.gemmap.gemmap.auth.application.dto.response.RegisterResponseDto;
+import com.gemmap.gemmap.auth.application.dto.response.SocialLoginResponseDto;
 import com.gemmap.gemmap.auth.application.service.AuthService;
 import com.gemmap.gemmap.shared.common.annotation.UserId;
 import com.gemmap.gemmap.shared.common.constants.Constant;
@@ -32,15 +33,35 @@ public class AuthController {
      * 모바일 앱에서 획득한 카카오 Access Token으로 인증
      */
     @PostMapping("/kakao/login")
-    public ResponseEntity<KakaoLoginResponseDto> kakaoSdkLogin(HttpServletRequest request) {
+    public ResponseEntity<SocialLoginResponseDto> kakaoSdkLogin(HttpServletRequest request) {
         log.info("카카오 SDK 로그인 요청");
 
         // Authorization 헤더에서 카카오 Access Token 추출
         String kakaoAccessToken = HeaderUtil.refineHeader(request, Constant.AUTHORIZATION_HEADER, Constant.BEARER_PREFIX)
                 .orElseThrow(() -> new CommonException(ErrorCode.INVALID_TOKEN));
 
-        KakaoLoginResponseDto loginResponse = authService.authenticateWithKakaoAccessToken(kakaoAccessToken);
+        SocialLoginResponseDto loginResponse = authService.authenticateWithKakaoAccessToken(kakaoAccessToken);
         log.info("카카오 SDK 로그인 성공 - 사용자 ID: {}", loginResponse.userId());
+        return ResponseEntity.ok(loginResponse);
+    }
+
+    /**
+     * Apple 로그인 (모바일 SDK 방식)
+     * 모바일 앱에서 획득한 Apple Identity Token으로 인증
+     */
+    @PostMapping("/apple/login")
+    public ResponseEntity<SocialLoginResponseDto> appleLogin(
+            HttpServletRequest request,
+            @RequestBody(required = false) AppleLoginRequestDto loginRequest) {
+        log.info("Apple 로그인 요청");
+
+        String identityToken = HeaderUtil.refineHeader(request, Constant.AUTHORIZATION_HEADER, Constant.BEARER_PREFIX)
+                .orElseThrow(() -> new CommonException(ErrorCode.INVALID_TOKEN));
+
+        String name = loginRequest != null ? loginRequest.name() : null;
+
+        SocialLoginResponseDto loginResponse = authService.authenticateWithAppleToken(identityToken, name);
+        log.info("Apple 로그인 성공 - 사용자 ID: {}", loginResponse.userId());
         return ResponseEntity.ok(loginResponse);
     }
 
@@ -65,14 +86,14 @@ public class AuthController {
      * 서비스 JWT 액세스 토큰 갱신
      */
     @PostMapping("/refresh")
-    public ResponseEntity<KakaoLoginResponseDto> refreshToken(HttpServletRequest request) {
+    public ResponseEntity<SocialLoginResponseDto> refreshToken(HttpServletRequest request) {
         log.info("서비스 토큰 갱신 요청");
 
         // Authorization 헤더에서 서비스 Refresh Token 추출
         String refreshToken = HeaderUtil.refineHeader(request, Constant.AUTHORIZATION_HEADER, Constant.BEARER_PREFIX)
                 .orElseThrow(() -> new CommonException(ErrorCode.INVALID_TOKEN));
 
-        KakaoLoginResponseDto loginResponse = authService.refreshAccessToken(refreshToken);
+        SocialLoginResponseDto loginResponse = authService.refreshAccessToken(refreshToken);
         return ResponseEntity.ok(loginResponse);
     }
 
