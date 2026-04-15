@@ -111,24 +111,17 @@ public class AuthService {
      * 외부 Apple 토큰 검증은 트랜잭션 밖에서 수행하고,
      * DB 작업은 AppleLoginTransactionService로 위임한다.
      */
-    public SocialLoginResponseDto authenticateWithAppleToken(String identityToken, String name) {
+    public SocialLoginResponseDto authenticateWithAppleToken(String identityToken, String email, String name) {
         if (identityToken == null || identityToken.trim().isEmpty()) {
             throw new CommonException(ErrorCode.INVALID_INPUT_VALUE);
         }
 
-        try {
-            AppleIdentityTokenClaims claims = appleOAuth2Service.validateAndExtractClaims(identityToken);
-            return appleLoginTransactionService.completeAppleLogin(
-                    claims.sub(),
-                    claims.email(),
-                    name
-            );
-        } catch (CommonException e) {
-            throw e;
-        } catch (Exception e) {
-            log.error("Apple 로그인 처리 중 예상치 못한 오류: {}", e.getMessage(), e);
-            throw new CommonException(ErrorCode.INTERNAL_SERVER_ERROR);
-        }
+        AppleIdentityTokenClaims claims = appleOAuth2Service.validateAndExtractClaims(identityToken);
+        return appleLoginTransactionService.completeAppleLogin(
+                claims.sub(),
+                email,
+                name
+        );
     }
 
     /**
