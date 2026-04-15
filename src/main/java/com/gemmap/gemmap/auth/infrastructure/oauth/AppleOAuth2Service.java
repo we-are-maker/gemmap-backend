@@ -64,8 +64,7 @@ public class AppleOAuth2Service {
             validateClaims(claims);
 
             return new AppleIdentityTokenClaims(
-                    claims.getSubject(),
-                    claims.get("email", String.class)
+                    claims.getSubject()
             );
         } catch (CommonException e) {
             throw e;

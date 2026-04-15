@@ -59,8 +59,9 @@ public class AuthController {
                 .orElseThrow(() -> new CommonException(ErrorCode.INVALID_TOKEN));
 
         String name = loginRequest != null ? loginRequest.name() : null;
+        String email = loginRequest != null ? loginRequest.email() : null;
 
-        SocialLoginResponseDto loginResponse = authService.authenticateWithAppleToken(identityToken, name);
+        SocialLoginResponseDto loginResponse = authService.authenticateWithAppleToken(identityToken, email, name);
         log.info("Apple 로그인 성공 - 사용자 ID: {}", loginResponse.userId());
         return ResponseEntity.ok(loginResponse);
     }
