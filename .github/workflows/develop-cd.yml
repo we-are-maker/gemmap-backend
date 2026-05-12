@@ -97,7 +97,13 @@ jobs:
               -e KAKAO_CLIENT_SECRET='${{ secrets.KAKAO_CLIENT_SECRET }}' \
               -e KAKAO_REDIRECT_URI='${{ secrets.KAKAO_REDIRECT_URI }}' \
               -e KAKAO_APP_ID='${{ secrets.KAKAO_APP_ID }}' \
+              -e KAKAO_ADMIN_KEY='${{ secrets.KAKAO_ADMIN_KEY }}' \
               -e APPLE_BUNDLE_ID='${{ secrets.APPLE_BUNDLE_ID }}' \
+              -e APPLE_TEAM_ID='${{ secrets.APPLE_TEAM_ID }}' \
+              -e APPLE_KEY_ID='${{ secrets.APPLE_KEY_ID }}' \
+              -e APPLE_PRIVATE_KEY='${{ secrets.APPLE_PRIVATE_KEY }}' \
+              -e APPLE_REFRESH_TOKEN_ENC_PASSWORD='${{ secrets.APPLE_REFRESH_TOKEN_ENC_PASSWORD }}' \
+              -e APPLE_REFRESH_TOKEN_ENC_SALT='${{ secrets.APPLE_REFRESH_TOKEN_ENC_SALT }}' \
               \
               -e S3_ENDPOINT='${{ secrets.S3_ENDPOINT }}' \
               -e S3_REGION='${{ secrets.S3_REGION }}' \
