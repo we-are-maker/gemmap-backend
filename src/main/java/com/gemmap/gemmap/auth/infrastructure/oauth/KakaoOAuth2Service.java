@@ -12,6 +12,8 @@ import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
+import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 
@@ -37,12 +39,16 @@ public class KakaoOAuth2Service {
     @Value("${oauth2.kakao.app-id}")
     private Long appId;
 
+    @Value("${oauth2.kakao.admin-key}")
+    private String adminKey;
+
     private static final String KAUTH_HOST = "https://kauth.kakao.com";
     private static final String KAPI_HOST = "https://kapi.kakao.com";
     private static final String TOKEN_ENDPOINT = "/oauth/token";
     private static final String USER_INFO_ENDPOINT = "/v2/user/me";
     private static final String ACCESS_TOKEN_INFO_ENDPOINT = "/v1/user/access_token_info";
     private static final String LOGOUT_ENDPOINT = "/v1/user/logout";
+    private static final String UNLINK_ENDPOINT = "/v1/user/unlink";
     private static final String AUTHORIZE_ENDPOINT = "/oauth/authorize";
     private static final String DEFAULT_SCOPE = "profile_nickname profile_image account_email name gender age_range birthday birthyear";
     private static final String PROPERTY_KEYS = "[\"kakao_account.profile\", \"kakao_account.email\", \"kakao_account.name\", \"kakao_account.gender\", \"kakao_account.age_range\", \"kakao_account.birthday\", \"kakao_account.birthyear\"]";
@@ -256,6 +262,50 @@ public class KakaoOAuth2Service {
         } catch (Exception e) {
             log.warn("카카오 로그아웃 API 호출 실패 (계속 진행): {}", e.getMessage());
             // 카카오 로그아웃 실패는 서비스 로그아웃에 영향을 주지 않음
+        }
+    }
+
+    /**
+     * Kakao 연결 끊기 (Admin Key 방식)
+     *
+     * 성공: 200 { "id": socialId } / 404(이미 해제됨): 멱등 성공 처리
+     * 그 외 실패: CommonException(KAKAO_UNLINK_FAILED)
+     */
+    public void unlink(long socialId) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
+        headers.set(HttpHeaders.AUTHORIZATION, "KakaoAK " + adminKey);
+
+        MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
+        params.add("target_id_type", "user_id");
+        params.add("target_id", String.valueOf(socialId));
+
+        HttpEntity<MultiValueMap<String, String>> request = new HttpEntity<>(params, headers);
+
+        try {
+            ResponseEntity<String> response = restTemplate.exchange(
+                    KAPI_HOST + UNLINK_ENDPOINT,
+                    HttpMethod.POST,
+                    request,
+                    String.class
+            );
+
+            if (response.getStatusCode() == HttpStatus.OK) {
+                log.info("Kakao unlink 성공 - socialId: {}", socialId);
+                return;
+            }
+
+            log.error("Kakao unlink 비정상 응답: status={}, body={}", response.getStatusCode(), response.getBody());
+            throw new CommonException(ErrorCode.KAKAO_UNLINK_FAILED);
+        } catch (HttpClientErrorException.NotFound e) {
+            // 이미 해제된 사용자 → 멱등 처리
+            log.info("Kakao unlink: 이미 해제된 사용자 (404) - socialId: {}", socialId);
+        } catch (HttpClientErrorException e) {
+            log.error("Kakao unlink 4xx: status={}, body={}", e.getStatusCode(), e.getResponseBodyAsString());
+            throw new CommonException(ErrorCode.KAKAO_UNLINK_FAILED);
+        } catch (RestClientException e) {
+            log.error("Kakao unlink RestClient 오류: {}", e.getMessage(), e);
+            throw new CommonException(ErrorCode.KAKAO_UNLINK_FAILED);
         }
     }
 }

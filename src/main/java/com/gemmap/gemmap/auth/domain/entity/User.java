@@ -75,6 +75,9 @@ public class User {
     @Column(name = "photo_consent_agreed_at")
     private LocalDateTime photoConsentAgreedAt;
 
+    @Column(name = "apple_refresh_token", length = 500)
+    private String appleRefreshToken;
+
     /* User Info */
 
     @Column(name = "email")
@@ -173,6 +176,14 @@ public class User {
         this.deleteDate = LocalDate.now(KST);
         this.refreshToken = null;
         this.isLogin = false;
+    }
+
+    public void updateAppleRefreshToken(String encryptedRefreshToken) {
+        this.appleRefreshToken = encryptedRefreshToken;
+    }
+
+    public void clearAppleRefreshToken() {
+        this.appleRefreshToken = null;
     }
 
     public void recoverUser() {

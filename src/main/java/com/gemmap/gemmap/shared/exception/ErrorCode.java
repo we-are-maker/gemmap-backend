@@ -78,7 +78,8 @@ public enum ErrorCode {
     KAKAO_TOKEN_REQUEST_FAILED(50201, HttpStatus.BAD_GATEWAY, "카카오 토큰 요청에 실패했습니다."),
     KAKAO_USER_INFO_REQUEST_FAILED(50202, HttpStatus.BAD_GATEWAY, "카카오 사용자 정보 조회에 실패했습니다."),
     KAKAO_TOKEN_REFRESH_FAILED(50203, HttpStatus.BAD_GATEWAY, "카카오 토큰 갱신에 실패했습니다."),
-    OAUTH2_COMMUNICATION_ERROR(50204, HttpStatus.BAD_GATEWAY, "OAuth2 제공자와의 통신 중 오류가 발생했습니다.");
+    OAUTH2_COMMUNICATION_ERROR(50204, HttpStatus.BAD_GATEWAY, "OAuth2 제공자와의 통신 중 오류가 발생했습니다."),
+    KAKAO_UNLINK_FAILED(50205, HttpStatus.BAD_GATEWAY, "카카오 계정 연결 해제에 실패했습니다.");
 
     private final int code;
     private final HttpStatus httpStatus;

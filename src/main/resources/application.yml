@@ -38,8 +38,18 @@ oauth2:
     client-secret: ${KAKAO_CLIENT_SECRET}
     redirect-uri: ${KAKAO_REDIRECT_URI}
     app-id: ${KAKAO_APP_ID}
+    admin-key: ${KAKAO_ADMIN_KEY}
   apple:
     bundle-id: ${APPLE_BUNDLE_ID}
+    team-id: ${APPLE_TEAM_ID}
+    key-id: ${APPLE_KEY_ID}
+    private-key: ${APPLE_PRIVATE_KEY}
+
+# 암호화 설정 — Spring Security Encryptors.text (AES-256-CBC + 랜덤 IV)
+crypto:
+  apple-refresh-token:
+    enc-password: ${APPLE_REFRESH_TOKEN_ENC_PASSWORD}
+    enc-salt: ${APPLE_REFRESH_TOKEN_ENC_SALT}
 
 # OCI Object Storage 설정 (S3 호환)
 s3:

@@ -24,8 +24,12 @@ public class AppleLoginTransactionService {
     private final JwtUtil jwtUtil;
 
     @Transactional
-    public SocialLoginResponseDto completeAppleLogin(String socialId, String email, String name) {
+    public SocialLoginResponseDto completeAppleLogin(
+            String socialId, String email, String name, String encryptedAppleRefreshToken
+    ) {
         User user = findOrCreateAppleUser(socialId, email, name);
+
+        user.updateAppleRefreshToken(encryptedAppleRefreshToken);
 
         JwtTokenDto jwtTokenDto = jwtUtil.generateTokens(user.getId(), user.getRole());
         user.updateRefreshToken(jwtTokenDto.getRefreshToken());
