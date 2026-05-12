@@ -11,6 +11,7 @@ import com.gemmap.gemmap.shared.exception.CommonException;
 import com.gemmap.gemmap.shared.exception.ErrorCode;
 import com.gemmap.gemmap.shared.util.HeaderUtil;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -52,16 +53,18 @@ public class AuthController {
     @PostMapping("/apple/login")
     public ResponseEntity<SocialLoginResponseDto> appleLogin(
             HttpServletRequest request,
-            @RequestBody(required = false) AppleLoginRequestDto loginRequest) {
+            @Valid @RequestBody AppleLoginRequestDto loginRequest) {
         log.info("Apple 로그인 요청");
 
         String identityToken = HeaderUtil.refineHeader(request, Constant.AUTHORIZATION_HEADER, Constant.BEARER_PREFIX)
                 .orElseThrow(() -> new CommonException(ErrorCode.INVALID_TOKEN));
 
-        String name = loginRequest != null ? loginRequest.name() : null;
-        String email = loginRequest != null ? loginRequest.email() : null;
-
-        SocialLoginResponseDto loginResponse = authService.authenticateWithAppleToken(identityToken, email, name);
+        SocialLoginResponseDto loginResponse = authService.authenticateWithAppleToken(
+                identityToken,
+                loginRequest.email(),
+                loginRequest.name(),
+                loginRequest.authorizationCode()
+        );
         log.info("Apple 로그인 성공 - 사용자 ID: {}", loginResponse.userId());
         return ResponseEntity.ok(loginResponse);
     }
@@ -107,6 +110,17 @@ public class AuthController {
         log.info("서비스 로그아웃 요청 - 사용자 ID: {}", userId);
 
         authService.logout(userId);
+        return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * 회원 탈퇴
+     * - Provider(Kakao/Apple)별 연결 해제 수행 후 서비스 탈퇴 처리
+     */
+    @PostMapping("/withdraw")
+    public ResponseEntity<Void> withdraw(@UserId Long userId) {
+        log.info("회원 탈퇴 요청 - 사용자 ID: {}", userId);
+        authService.withdraw(userId);
         return ResponseEntity.noContent().build();
     }
 

@@ -1,6 +1,7 @@
 package com.gemmap.gemmap.auth.application.service;
 
 import com.gemmap.gemmap.auth.application.dto.apple.AppleIdentityTokenClaims;
+import com.gemmap.gemmap.auth.application.dto.apple.AppleTokenResponse;
 import com.gemmap.gemmap.auth.application.dto.kakao.KakaoAccessTokenInfoResponse;
 import com.gemmap.gemmap.auth.application.dto.kakao.KakaoUserInfoResponse;
 import com.gemmap.gemmap.auth.application.dto.response.PhotoConsentResponse;
@@ -22,6 +23,8 @@ import com.gemmap.gemmap.shared.infrastructure.objectstorage.ObjectStorageServic
 import com.gemmap.gemmap.shared.infrastructure.objectstorage.S3UrlGenerator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.security.crypto.encrypt.TextEncryptor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -53,6 +56,11 @@ public class AuthService {
     private final KakaoOAuth2Service kakaoOAuth2Service;
     private final AppleOAuth2Service appleOAuth2Service;
     private final AppleLoginTransactionService appleLoginTransactionService;
+    private final WithdrawTransactionService withdrawTransactionService;
+
+    @Qualifier("appleRefreshTokenEncryptor")
+    private final TextEncryptor appleRefreshTokenEncryptor;
+
     private final ObjectStorageService objectStorageService;
     private final S3UrlGenerator s3UrlGenerator;
     private final S3Properties s3Properties;
@@ -108,19 +116,31 @@ public class AuthService {
 
     /**
      * Apple Identity Token으로 인증 (모바일 SDK 방식)
-     * 외부 Apple 토큰 검증은 트랜잭션 밖에서 수행하고,
-     * DB 작업은 AppleLoginTransactionService로 위임한다.
+     * 외부 Apple 토큰 검증·authorization_code 교환·암호화는 트랜잭션 밖에서 수행하고,
+     * DB 작업만 AppleLoginTransactionService로 위임한다.
      */
-    public SocialLoginResponseDto authenticateWithAppleToken(String identityToken, String email, String name) {
+    public SocialLoginResponseDto authenticateWithAppleToken(
+            String identityToken, String email, String name, String authorizationCode
+    ) {
         if (identityToken == null || identityToken.trim().isEmpty()) {
             throw new CommonException(ErrorCode.INVALID_INPUT_VALUE);
         }
+        if (authorizationCode == null || authorizationCode.trim().isEmpty()) {
+            throw new CommonException(ErrorCode.INVALID_INPUT_VALUE);
+        }
 
+        // 1) identityToken 검증 — 외부 HTTP (JWKS)
         AppleIdentityTokenClaims claims = appleOAuth2Service.validateAndExtractClaims(identityToken);
+
+        // 2) authorizationCode 교환 — 외부 HTTP (/auth/token)
+        AppleTokenResponse tokenResponse = appleOAuth2Service.exchangeAuthorizationCode(authorizationCode);
+
+        // 3) refresh_token 암호화
+        String encryptedAppleRefreshToken = appleRefreshTokenEncryptor.encrypt(tokenResponse.refreshToken());
+
+        // 4) DB 반영은 @Transactional 서비스로 위임
         return appleLoginTransactionService.completeAppleLogin(
-                claims.sub(),
-                email,
-                name
+                claims.sub(), email, name, encryptedAppleRefreshToken
         );
     }
 
@@ -520,6 +540,42 @@ public class AuthService {
             log.error("로그아웃 처리 중 예상치 못한 오류: {}", e.getMessage(), e);
             throw new CommonException(ErrorCode.INTERNAL_SERVER_ERROR);
         }
+    }
+
+    /**
+     * 회원 탈퇴
+     * - Kakao: Admin Key로 unlink
+     * - Apple: 저장된 refresh_token을 복호화 후 revoke
+     * 외부 API는 트랜잭션 외부에서 수행, DB 반영은 WithdrawTransactionService.
+     */
+    public void withdraw(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new CommonException(ErrorCode.USER_NOT_FOUND));
+
+        // 이미 탈퇴된 사용자 → 멱등 성공 처리
+        if (Boolean.TRUE.equals(user.getIsDeleted())) {
+            log.info("이미 탈퇴된 사용자의 탈퇴 재요청 - 멱등 성공 처리: userId={}", userId);
+            return;
+        }
+
+        switch (user.getEProvider()) {
+            case KAKAO -> {
+                long kakaoUserId = Long.parseLong(user.getSocialId());
+                kakaoOAuth2Service.unlink(kakaoUserId);
+            }
+            case APPLE -> {
+                String encrypted = user.getAppleRefreshToken();
+                if (encrypted == null || encrypted.isBlank()) {
+                    log.error("Apple 탈퇴 — apple_refresh_token 부재(설계상 발생 불가): userId={}", userId);
+                    throw new CommonException(ErrorCode.INTERNAL_SERVER_ERROR);
+                }
+                String refreshToken = appleRefreshTokenEncryptor.decrypt(encrypted);
+                appleOAuth2Service.revokeRefreshToken(refreshToken);
+            }
+        }
+
+        withdrawTransactionService.finalizeWithdraw(userId);
+        log.info("회원 탈퇴 완료 - userId: {}, provider: {}", userId, user.getEProvider());
     }
 
     /**
