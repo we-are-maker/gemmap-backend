@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.multipart.MultipartException;
 import org.springframework.web.servlet.NoHandlerFoundException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 import io.jsonwebtoken.JwtException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -87,11 +88,21 @@ public class GlobalExceptionHandler {
     }
 
     /**
-     * 존재하지 않는 URI 요청 처리 (404 Not Found)
+     * 존재하지 않는 URI 요청 처리 (404 Not Found) - Spring MVC 핸들러 없음
      */
     @ExceptionHandler(NoHandlerFoundException.class)
     public ResponseEntity<ExceptionDto> handleNoHandlerFoundException(NoHandlerFoundException e) {
         log.error("핸들러 없음: {}", e.getMessage());
+        return toErrorResponse(ErrorCode.RESOURCE_NOT_FOUND);
+    }
+
+    /**
+     * 존재하지 않는 정적 리소스 요청 처리 (404 Not Found) - Spring 6 신규 예외
+     * NoHandlerFoundException과 달리 ResourceHttpRequestHandler에서 발생
+     */
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<ExceptionDto> handleNoResourceFoundException(NoResourceFoundException e) {
+        log.warn("리소스 없음: {}", e.getMessage());
         return toErrorResponse(ErrorCode.RESOURCE_NOT_FOUND);
     }
 
