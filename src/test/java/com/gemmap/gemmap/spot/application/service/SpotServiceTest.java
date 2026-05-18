@@ -3,7 +3,7 @@ package com.gemmap.gemmap.spot.application.service;
 import com.gemmap.gemmap.auth.domain.entity.User;
 import com.gemmap.gemmap.auth.domain.repository.UserRepository;
 import com.gemmap.gemmap.shared.infrastructure.objectstorage.ObjectStorageService;
-import com.gemmap.gemmap.shared.infrastructure.objectstorage.S3UrlGenerator;
+import com.gemmap.gemmap.shared.infrastructure.objectstorage.S3PresignedUrlService;
 import com.gemmap.gemmap.shared.config.s3.S3Properties;
 import com.gemmap.gemmap.shared.exception.CommonException;
 import com.gemmap.gemmap.shared.exception.ErrorCode;
@@ -53,7 +53,7 @@ class SpotServiceTest {
     private ObjectStorageService objectStorageService;
 
     @Mock
-    private S3UrlGenerator s3UrlGenerator;
+    private S3PresignedUrlService s3PresignedUrlService;
 
     @Mock
     private S3Properties s3Properties;
@@ -102,7 +102,7 @@ class SpotServiceTest {
 
     private void mockS3UploadSuccess() throws Exception {
         doNothing().when(objectStorageService).upload(eq(TEST_BUCKET), anyString(), any());
-        given(s3UrlGenerator.generateUrl(anyString())).willReturn(TEST_FILE_URL);
+        given(s3PresignedUrlService.generatePresignedGetUrl(anyString())).willReturn(TEST_FILE_URL);
     }
 
     // =====================================================================

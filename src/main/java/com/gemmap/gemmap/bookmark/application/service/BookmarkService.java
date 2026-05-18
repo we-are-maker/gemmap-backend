@@ -10,6 +10,7 @@ import com.gemmap.gemmap.shared.common.enums.EAttractionLevel;
 import com.gemmap.gemmap.shared.common.enums.ESpotPhotoType;
 import com.gemmap.gemmap.shared.exception.CommonException;
 import com.gemmap.gemmap.shared.exception.ErrorCode;
+import com.gemmap.gemmap.shared.infrastructure.objectstorage.S3PresignedUrlService;
 import com.gemmap.gemmap.spot.application.dto.response.SpotSummary;
 import com.gemmap.gemmap.spot.domain.entity.Spot;
 import com.gemmap.gemmap.spot.domain.entity.SpotPhoto;
@@ -29,6 +30,7 @@ public class BookmarkService {
     private final SpotRepository spotRepository;
     private final SpotBookmarkRepository spotBookmarkRepository;
     private final SpotPhotoRepository spotPhotoRepository;
+    private final S3PresignedUrlService s3PresignedUrlService;
 
     /**
      * 젬 찜하기 (북마크 생성)
@@ -99,10 +101,11 @@ public class BookmarkService {
         List<SpotSummary> spotSummaries = bookmarks.stream()
                 .map(bookmark -> {
                     Spot spot = bookmark.getSpot();
-                    String fileUrl = spotPhotoRepository
+                    String key = spotPhotoRepository
                             .findFirstBySpotAndTypeOrderByCreatedAtDesc(spot, ESpotPhotoType.SPOT)
                             .map(SpotPhoto::getFileUrl)
                             .orElse(null);
+                    String fileUrl = (key != null) ? s3PresignedUrlService.generatePresignedGetUrl(key) : null;
                     return SpotSummary.of(spot, fileUrl);
                 })
                 .toList();

@@ -16,9 +16,10 @@ public record MySpotsResponse(
         Integer bookmarkedCount, // 찜(북마크)한 젬 개수
         Integer checkedInCount   // 체크인한 젬 개수
 ) {
-    public static MySpotsResponse of(User user, Integer createdCount, Integer bookmarkedCount, Integer checkedInCount) {
+    public static MySpotsResponse of(User user, Integer createdCount, Integer bookmarkedCount,
+                                     Integer checkedInCount, String profileImageUrl) {
         return MySpotsResponse.builder()
-                .profileImage(user.getProfileImage())
+                .profileImage(profileImageUrl)
                 .nickname(user.getNickname())
                 .createdCount(createdCount)
                 .bookmarkedCount(bookmarkedCount)

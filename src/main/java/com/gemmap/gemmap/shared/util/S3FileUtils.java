@@ -1,7 +1,6 @@
 package com.gemmap.gemmap.shared.util;
 
 import com.gemmap.gemmap.shared.infrastructure.objectstorage.ObjectStorageService;
-import com.gemmap.gemmap.shared.infrastructure.objectstorage.S3UrlGenerator;
 import com.gemmap.gemmap.shared.config.s3.S3Properties;
 import lombok.extern.slf4j.Slf4j;
 
@@ -48,27 +47,10 @@ public final class S3FileUtils {
                                   S3Properties s3Properties, String key) {
         try {
             objectStorageService.delete(s3Properties.getBucket(), key);
-            log.info("Compensated: deleted S3 object {}", key);
+            log.info("Deleted S3 object. key={}", key);
         } catch (Exception e) {
-            log.warn("Failed to delete S3 object {} during compensation", key, e);
-        }
-    }
-
-    /**
-     * S3 객체 삭제 — 베스트 에포트 (URL 기반)
-     * 체크인 취소/스팟 삭제 시 S3 객체를 삭제하는 베스트 에포트 로직
-     */
-    public static void safeDeleteByUrl(ObjectStorageService objectStorageService,
-                                       S3Properties s3Properties,
-                                       S3UrlGenerator s3UrlGenerator,
-                                       String fileUrl) {
-        try {
-            String key = s3UrlGenerator.extractKeyFromUrl(fileUrl);
-            objectStorageService.delete(s3Properties.getBucket(), key);
-            log.info("Successfully deleted S3 object. URL: {}", fileUrl);
-        } catch (Exception e) {
-            // 스토리지 삭제 실패는 로그만 남기고 계속 진행 (비용 이슈지만 참조 깨짐 없음)
-            log.error("Failed to delete S3 object (best-effort). URL: {}", fileUrl, e);
+            // 삭제 실패는 로그만 남기고 계속 진행 (보상/베스트 에포트 공용 — 참조 깨짐 없음)
+            log.warn("Failed to delete S3 object (best-effort). key={}", key, e);
         }
     }
 }
