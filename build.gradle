@@ -57,9 +57,6 @@ dependencies {
 	// AWS S3 SDK for NHN Object Storage
 	implementation("software.amazon.awssdk:s3")
 
-	// metadata-extractor for EXIF
-	implementation 'com.drewnoakes:metadata-extractor:2.19.0'
-
 	// hibernate-spatial for Point type
 	implementation 'org.hibernate.orm:hibernate-spatial:6.4.4.Final'
 }
