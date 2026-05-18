@@ -20,7 +20,7 @@ import com.gemmap.gemmap.shared.config.s3.S3Properties;
 import com.gemmap.gemmap.shared.exception.CommonException;
 import com.gemmap.gemmap.shared.exception.ErrorCode;
 import com.gemmap.gemmap.shared.infrastructure.objectstorage.ObjectStorageService;
-import com.gemmap.gemmap.shared.infrastructure.objectstorage.S3UrlGenerator;
+import com.gemmap.gemmap.shared.infrastructure.objectstorage.S3PresignedUrlService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -62,7 +62,7 @@ public class AuthService {
     private final TextEncryptor appleRefreshTokenEncryptor;
 
     private final ObjectStorageService objectStorageService;
-    private final S3UrlGenerator s3UrlGenerator;
+    private final S3PresignedUrlService s3PresignedUrlService;
     private final S3Properties s3Properties;
 
     /**
@@ -395,7 +395,7 @@ public class AuthService {
                     savedUser.getId(),
                     savedUser.getRole().toString(),
                     savedUser.getNickname(),
-                    savedUser.getProfileImage(),
+                    s3PresignedUrlService.resolveProfileImageUrl(savedUser.getProfileImage()),
                     jwtTokenDto.getAccessToken(),
                     jwtTokenDto.getRefreshToken()
             );
@@ -421,11 +421,10 @@ public class AuthService {
         // Object Storage에 업로드
         objectStorageService.upload(s3Properties.getBucket(), key, file);
 
-        // URL 생성 및 반환
-        String fileUrl = s3UrlGenerator.generateUrl(key);
-        log.info("프로필 이미지 업로드 완료 - URL: {}", fileUrl);
+        // S3 key 반환 (User.profileImage에 key 저장 — 응답 시 presigned 변환)
+        log.info("프로필 이미지 업로드 완료 - key: {}", key);
 
-        return fileUrl;
+        return key;
     }
 
     /**

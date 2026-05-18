@@ -9,7 +9,7 @@ import com.gemmap.gemmap.checkin.domain.entity.SpotCheckin;
 import com.gemmap.gemmap.checkin.domain.repository.SpotCheckinRepository;
 import com.gemmap.gemmap.shared.common.enums.ERecommendationLevel;
 import com.gemmap.gemmap.shared.infrastructure.objectstorage.ObjectStorageService;
-import com.gemmap.gemmap.shared.infrastructure.objectstorage.S3UrlGenerator;
+import com.gemmap.gemmap.shared.infrastructure.objectstorage.S3PresignedUrlService;
 import com.gemmap.gemmap.shared.common.enums.ESpotPhotoType;
 import com.gemmap.gemmap.shared.config.s3.S3Properties;
 import com.gemmap.gemmap.shared.exception.CommonException;
@@ -45,7 +45,7 @@ public class CheckinService {
     private final SpotCheckinRepository spotCheckinRepository;
     private final SpotPhotoRepository spotPhotoRepository;
     private final ObjectStorageService objectStorageService;
-    private final S3UrlGenerator s3UrlGenerator;
+    private final S3PresignedUrlService s3PresignedUrlService;
     private final S3Properties s3Properties;
     private final SpotFileValidator spotFileValidator;
 
@@ -86,12 +86,9 @@ public class CheckinService {
 
         // 6) S3 업로드 (키 규칙 예: spots/yyyy/MM/uuid.ext)
         String key = S3FileUtils.buildKey(checkinBasePath, file.getOriginalFilename());
-        String fileUrl;
         try {
             // 기존 ObjectStorageService 사용
             objectStorageService.upload(s3Properties.getBucket(), key, file);
-            // URL 생성 (NHN Cloud 형식)
-            fileUrl = s3UrlGenerator.generateUrl(key);
         } catch (Exception e) {
             log.error("S3 upload failed for key: {}", key, e);
             throw new CommonException(ErrorCode.FILE_UPLOAD_FAILED);
@@ -102,7 +99,7 @@ public class CheckinService {
             SpotPhoto photo = SpotPhoto.builder()
                     .spot(spot)
                     .user(user)
-                    .fileUrl(fileUrl)
+                    .fileUrl(key)
                     .type(ESpotPhotoType.CHECKIN)
                     .takenAt(DateTimeUtils.parseTakenAt(req.takenAt()))
                     .latitude(req.latitude())
@@ -126,8 +123,8 @@ public class CheckinService {
                     .build();
             spotCheckinRepository.save(checkin);
 
-            // 9) 응답
-            return CheckinCreateResponse.of(checkin, fileUrl);
+            // 9) 응답 (presigned URL)
+            return CheckinCreateResponse.of(checkin, s3PresignedUrlService.generatePresignedGetUrl(key));
         } catch (RuntimeException ex) {
             // 보상 트랜잭션: DB 저장 실패 시 업로드된 S3 객체 삭제
             S3FileUtils.safeDelete(objectStorageService, s3Properties, key);
@@ -148,9 +145,9 @@ public class CheckinService {
         SpotCheckin checkin = spotCheckinRepository.findByUserIdAndSpotId(userId, spotId)
                 .orElseThrow(() -> new CommonException(ErrorCode.CHECKIN_NOT_FOUND));
 
-        // 2) photo_id FK로 사진 조회 → fileUrl 추출
+        // 2) photo_id FK로 사진 조회 → S3 key 추출
         SpotPhoto photo = checkin.getPhoto();
-        String fileUrl = photo.getFileUrl();
+        String key = photo.getFileUrl();
 
         // 3) spot_checkins 삭제 (FK 참조 해제)
         spotCheckinRepository.delete(checkin);
@@ -159,7 +156,7 @@ public class CheckinService {
         spotPhotoRepository.delete(photo);
 
         // 5) S3 삭제 (베스트 에포트)
-        S3FileUtils.safeDeleteByUrl(objectStorageService, s3Properties, s3UrlGenerator, fileUrl);
+        S3FileUtils.safeDelete(objectStorageService, s3Properties, key);
     }
 
     /**
@@ -201,7 +198,8 @@ public class CheckinService {
     public MyCheckinSpotsResponse getMyCheckinSpots(Long userId) {
         List<SpotCheckin> checkins = spotCheckinRepository.findByUserIdOrderByCreatedAtDesc(userId);
         List<SpotSummary> spotSummaries = checkins.stream()
-                .map(checkin -> SpotSummary.of(checkin.getSpot(), checkin.getPhoto().getFileUrl()))
+                .map(checkin -> SpotSummary.of(checkin.getSpot(),
+                        s3PresignedUrlService.generatePresignedGetUrl(checkin.getPhoto().getFileUrl())))
                 .toList();
         return MyCheckinSpotsResponse.of(spotSummaries);
     }

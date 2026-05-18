@@ -37,14 +37,15 @@ public record SpotDetailResponse(
 ) {
 
     public static SpotDetailResponse from (Spot spot, User spotOwner, SpotPhoto photo,
+                                           String photoUrl, String profileImageUrl,
                                            Integer bookmarkedCount, Integer checkedInCount,
                                            EAttractionLevel attractionLevel, ERecommendationLevel recommendationLevel) {
         return SpotDetailResponse.builder()
                 .spotId(spot.getId())
-                .profileImage(spotOwner.getProfileImage())
+                .profileImage(profileImageUrl)
                 .nickname(spotOwner.getNickname())
                 .alias(spot.getAlias())
-                .fileUrl(photo.getFileUrl())
+                .fileUrl(photoUrl)
                 .address(spot.getFullAddress())
                 .bookmarkedCount(bookmarkedCount)
                 .checkedInCount(checkedInCount)

@@ -7,7 +7,7 @@ import com.gemmap.gemmap.checkin.application.service.CheckinService;
 import com.gemmap.gemmap.checkin.domain.repository.SpotCheckinRepository;
 import com.gemmap.gemmap.shared.common.enums.ERecommendationLevel;
 import com.gemmap.gemmap.shared.infrastructure.objectstorage.ObjectStorageService;
-import com.gemmap.gemmap.shared.infrastructure.objectstorage.S3UrlGenerator;
+import com.gemmap.gemmap.shared.infrastructure.objectstorage.S3PresignedUrlService;
 import com.gemmap.gemmap.shared.common.enums.EAttractionLevel;
 import com.gemmap.gemmap.shared.common.enums.ESpotPhotoType;
 import com.gemmap.gemmap.shared.config.s3.S3Properties;
@@ -44,7 +44,7 @@ public class SpotService {
     private final UserRepository userRepository;
     private final SpotPhotoRepository spotPhotoRepository;
     private final ObjectStorageService objectStorageService;
-    private final S3UrlGenerator s3UrlGenerator;
+    private final S3PresignedUrlService s3PresignedUrlService;
     private final S3Properties s3Properties;
     private final SpotFileValidator spotFileValidator;
 
@@ -76,11 +76,9 @@ public class SpotService {
 
         // 4) 업로드 (키 규칙 예: spots/yyyy/MM/uuid.ext)
         String key = S3FileUtils.buildKey(spotBasePath, file.getOriginalFilename());
-        String fileUrl;
         try {
             // 기존 ObjectStorageService 사용
             objectStorageService.upload(s3Properties.getBucket(), key, file);
-            fileUrl = s3UrlGenerator.generateUrl(key);
         } catch (Exception e) {
             log.error("S3 upload failed for key: {}", key, e);
             throw new CommonException(ErrorCode.FILE_UPLOAD_FAILED);
@@ -102,11 +100,11 @@ public class SpotService {
                     .build()
             );
 
-            // 6) spot_photos 저장 (type=SPOT, fileUrl 직접 저장, user 저장)
+            // 6) spot_photos 저장 (type=SPOT, S3 key 저장, user 저장)
             SpotPhoto photo = SpotPhoto.builder()
                 .spot(spot)
                 .user(user)
-                .fileUrl(fileUrl)
+                .fileUrl(key)
                 .type(ESpotPhotoType.SPOT)
                 .takenAt(DateTimeUtils.parseTakenAt(req.takenAt()))
                 .latitude(req.latitude())
@@ -121,10 +119,10 @@ public class SpotService {
                 .build();
             spotPhotoRepository.save(photo);
 
-            // 7) 응답
+            // 7) 응답 (presigned URL)
             return SpotCreateResponse.builder()
                 .spotId(spot.getId())
-                .fileUrl(fileUrl)
+                .fileUrl(s3PresignedUrlService.generatePresignedGetUrl(key))
                 .build();
         } catch (RuntimeException ex) {
             // 보상 트랜잭션: DB 저장 실패 시 업로드된 S3 객체 삭제
@@ -165,9 +163,9 @@ public class SpotService {
             throw new CommonException(ErrorCode.ACCESS_DENIED, "해당 스팟을 삭제할 권한이 없습니다.");
         }
 
-        // 4) 연결된 SpotPhoto 조회 (fileUrl 추출용)
+        // 4) 연결된 SpotPhoto 조회 (S3 key 추출용)
         List<SpotPhoto> photos = spotPhotoRepository.findBySpot(spot);
-        List<String> fileUrls = photos.stream()
+        List<String> keys = photos.stream()
             .map(SpotPhoto::getFileUrl)
             .toList();
 
@@ -175,8 +173,8 @@ public class SpotService {
         spotRepository.delete(spot);
 
         // 6) Object Storage 삭제 (트랜잭션 외부, 베스트 에포트)
-        for (String fileUrl : fileUrls) {
-            S3FileUtils.safeDeleteByUrl(objectStorageService, s3Properties, s3UrlGenerator, fileUrl);
+        for (String key : keys) {
+            S3FileUtils.safeDelete(objectStorageService, s3Properties, key);
         }
     }
 
@@ -218,8 +216,10 @@ public class SpotService {
         // 8) 추천지수(나의 평가) 조회 - 체크인 하지 않은 경우 null
         ERecommendationLevel recommendationLevel = checkinService.getRecommendationLevel(userId, spotId);
 
-        // 9) 응답 DTO 변환
-        return SpotDetailResponse.from(spot, spotOwner, representativePhoto,
+        // 9) 응답 DTO 변환 (사진=presigned, 프로필=분기 resolve)
+        String photoUrl = s3PresignedUrlService.generatePresignedGetUrl(representativePhoto.getFileUrl());
+        String ownerProfileUrl = s3PresignedUrlService.resolveProfileImageUrl(spotOwner.getProfileImage());
+        return SpotDetailResponse.from(spot, spotOwner, representativePhoto, photoUrl, ownerProfileUrl,
                 bookmarkedCount, checkedInCount, attractionLevel, recommendationLevel);
     }
 
@@ -239,7 +239,8 @@ public class SpotService {
         // 체크인한 젬 개수
         Integer checkedInCount = checkinService.getCheckinCount(userId);
 
-        return MySpotsResponse.of(user, createdCount, bookmarkedCount, checkedInCount);
+        String profileImageUrl = s3PresignedUrlService.resolveProfileImageUrl(user.getProfileImage());
+        return MySpotsResponse.of(user, createdCount, bookmarkedCount, checkedInCount, profileImageUrl);
     }
 
     /**
@@ -257,10 +258,11 @@ public class SpotService {
         // 각 스팟의 대표 사진 URL 조회 -> SpotSummary 변환
         List<SpotSummary> spotSummaries = spots.stream()
                 .map(spot -> {
-                    String fileUrl = spotPhotoRepository
+                    String key = spotPhotoRepository
                             .findFirstBySpotAndUserAndTypeOrderByCreatedAtDesc(spot, user, ESpotPhotoType.SPOT)
                             .map(SpotPhoto::getFileUrl)
                             .orElse(null);
+                    String fileUrl = (key != null) ? s3PresignedUrlService.generatePresignedGetUrl(key) : null;
                     return SpotSummary.of(spot, fileUrl);
                 })
                 .toList();
