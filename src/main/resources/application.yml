@@ -51,14 +51,9 @@ crypto:
     enc-password: ${APPLE_REFRESH_TOKEN_ENC_PASSWORD}
     enc-salt: ${APPLE_REFRESH_TOKEN_ENC_SALT}
 
-# OCI Object Storage 설정 (S3 호환)
+# AWS S3 설정
 s3:
-  credentials:
-    access-key: ${S3_ACCESS_KEY}
-    secret-key: ${S3_SECRET_KEY}
-  endpoint: ${S3_ENDPOINT}
   region:
     name: ${S3_REGION}
   bucket: ${S3_BUCKET}
   base-path: ${S3_BASE_PATH}
-  path-style-access-enabled: true

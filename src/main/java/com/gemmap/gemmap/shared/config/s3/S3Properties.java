@@ -14,23 +14,10 @@ import org.springframework.validation.annotation.Validated;
 @ConfigurationProperties(prefix = "s3")
 public class S3Properties {
 
-    private Credentials credentials = new Credentials();
     private Region region = new Region();
-    @NotEmpty
-    private String endpoint;
     @NotEmpty
     private String bucket;
     private String basePath;
-    private boolean pathStyleAccessEnabled = true;
-
-    @Getter
-    @Setter
-    public static class Credentials {
-        @NotEmpty
-        private String accessKey;
-        @NotEmpty
-        private String secretKey;
-    }
 
     @Getter
     @Setter
