@@ -234,6 +234,7 @@ public class AppleOAuth2Service {
         }
         try {
             String pem = privateKeyPem
+                    .replace("\\n", "\n")
                     .replace("-----BEGIN PRIVATE KEY-----", "")
                     .replace("-----END PRIVATE KEY-----", "")
                     .replaceAll("\\s", "");
