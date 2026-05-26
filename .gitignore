@@ -78,6 +78,8 @@ nul
 
 # Document
 docs
+worklog
+portfolio
 
 # Postman
 .postman/

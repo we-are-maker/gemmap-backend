@@ -57,3 +57,7 @@ s3:
   base-path: "test/"
   spot-base-path: "test/spots/"
   checkin-base-path: "test/checkins/"
+
+# 회원 탈퇴 후 재가입 정책 (테스트용)
+withdraw:
+  rejoin-grace-period-days: 30
