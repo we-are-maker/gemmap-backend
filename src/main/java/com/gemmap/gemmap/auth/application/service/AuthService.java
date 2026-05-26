@@ -172,7 +172,10 @@ public class AuthService {
         if (softDeleted.isPresent()) {
             User user = softDeleted.get();
             LocalDate originalDeleteDate = user.getDeleteDate();   // recoverUser() 전에 보관
-            boolean expired = isGracePeriodExpired(originalDeleteDate);
+            if (originalDeleteDate == null) {
+                log.warn("soft-deleted 사용자의 delete_date가 null — 데이터 정합성 점검 필요. 유예 경과로 간주");
+            }
+            boolean expired = user.isGracePeriodExpired(rejoinGracePeriodDays);
 
             user.recoverUser();
             updateKakaoUserInfo(user, userInfo);   // 소셜 리니어블 최신화 먼저
@@ -201,16 +204,6 @@ public class AuthService {
         }
     }
 
-    private boolean isGracePeriodExpired(LocalDate deleteDate) {
-        if (deleteDate == null) {
-            // soft-deleted인데 deleteDate가 NULL인 비정상 상태 → 데이터 정합성 점검 필요
-            // 안전한 fallback: 유예 경과로 간주하여 초기화 처리
-            log.warn("soft-deleted 사용자의 delete_date가 null — 데이터 정합성 점검 필요. 유예 경과로 간주");
-            return true;
-        }
-        LocalDate today = LocalDate.now(KST);
-        return today.isAfter(deleteDate.plusDays(rejoinGracePeriodDays));
-    }
 
     /**
      * 카카오 사용자 생성

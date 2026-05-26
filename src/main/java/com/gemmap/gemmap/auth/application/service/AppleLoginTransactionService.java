@@ -17,15 +17,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
-import java.time.ZoneId;
 import java.util.Optional;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class AppleLoginTransactionService {
-
-    private static final ZoneId KST = ZoneId.of("Asia/Seoul");
 
     @Value("${withdraw.rejoin-grace-period-days:30}")
     private int rejoinGracePeriodDays;
@@ -73,7 +70,10 @@ public class AppleLoginTransactionService {
         if (softDeleted.isPresent()) {
             User user = softDeleted.get();
             LocalDate originalDeleteDate = user.getDeleteDate();   // recoverUser() 전에 보관
-            boolean expired = isGracePeriodExpired(originalDeleteDate);
+            if (originalDeleteDate == null) {
+                log.warn("soft-deleted Apple 사용자의 delete_date가 null — 데이터 정합성 점검 필요. 유예 경과로 간주");
+            }
+            boolean expired = user.isGracePeriodExpired(rejoinGracePeriodDays);
 
             user.recoverUser();
             // Apple은 복구 경로에서 email/name 갱신하지 않음 (Apple SDK가 재로그인 시 제공 안 함 — 공식 동작)
@@ -90,14 +90,6 @@ public class AppleLoginTransactionService {
         return createAppleUser(socialId, email, name);
     }
 
-    private boolean isGracePeriodExpired(LocalDate deleteDate) {
-        if (deleteDate == null) {
-            log.warn("soft-deleted Apple 사용자의 delete_date가 null — 데이터 정합성 점검 필요. 유예 경과로 간주");
-            return true;
-        }
-        LocalDate today = LocalDate.now(KST);
-        return today.isAfter(deleteDate.plusDays(rejoinGracePeriodDays));
-    }
 
     private User createAppleUser(String socialId, String email, String name) {
         validateAppleSignupInfo(email, name);

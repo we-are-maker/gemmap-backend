@@ -213,6 +213,18 @@ public class User {
         }
     }
 
+    /**
+     * 탈퇴 유예 기간 만료 여부.
+     * deleteDate가 null인 비정상 상태는 유예 경과로 간주(안전한 fallback).
+     */
+    public boolean isGracePeriodExpired(int gracePeriodDays) {
+        if (this.deleteDate == null) {
+            return true;
+        }
+        LocalDate today = LocalDate.now(KST);
+        return today.isAfter(this.deleteDate.plusDays(gracePeriodDays));
+    }
+
     public void agreeToPhotoConsent() {
         this.photoConsentAgreedAt = LocalDateTime.now(KST);
     }
