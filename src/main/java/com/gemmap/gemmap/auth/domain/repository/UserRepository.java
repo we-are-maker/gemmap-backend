@@ -33,6 +33,9 @@ public interface UserRepository extends JpaRepository<User, Long> {
     @Query("SELECT u FROM User u WHERE u.socialId = :socialId AND u.eProvider = :provider AND u.isDeleted = false")
     Optional<User> findBySocialIdAndProvider(String socialId, EProvider provider);
 
+    @Query("SELECT u FROM User u WHERE u.socialId = :socialId AND u.eProvider = :provider AND u.isDeleted = true")
+    Optional<User> findSoftDeletedBySocialIdAndProvider(String socialId, EProvider provider);
+
     @Query("SELECT u FROM User u WHERE u.email = :email AND u.isDeleted = false")
     Optional<User> findByEmail(String email);
 

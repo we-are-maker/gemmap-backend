@@ -11,14 +11,24 @@ import com.gemmap.gemmap.shared.exception.CommonException;
 import com.gemmap.gemmap.shared.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.util.Optional;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class AppleLoginTransactionService {
+
+    private static final ZoneId KST = ZoneId.of("Asia/Seoul");
+
+    @Value("${withdraw.rejoin-grace-period-days:30}")
+    private int rejoinGracePeriodDays;
 
     private final UserRepository userRepository;
     private final JwtUtil jwtUtil;
@@ -50,8 +60,43 @@ public class AppleLoginTransactionService {
             throw new CommonException(ErrorCode.INVALID_INPUT_VALUE);
         }
 
-        return userRepository.findBySocialIdAndProvider(socialId, EProvider.APPLE)
-                .orElseGet(() -> createAppleUser(socialId, email, name));
+        // 1) 활성 사용자 조회
+        Optional<User> activeUser = userRepository.findBySocialIdAndProvider(socialId, EProvider.APPLE);
+        if (activeUser.isPresent()) {
+            return activeUser.get();
+        }
+
+        // 2) soft-deleted 사용자 조회 → 재가입 분기
+        //    Apple 공식 동작상 재로그인 시 name/email은 null로 와도 정상.
+        //    복구 경로에서는 validateAppleSignupInfo 우회 + 기존 DB 값 유지.
+        Optional<User> softDeleted = userRepository.findSoftDeletedBySocialIdAndProvider(socialId, EProvider.APPLE);
+        if (softDeleted.isPresent()) {
+            User user = softDeleted.get();
+            LocalDate originalDeleteDate = user.getDeleteDate();   // recoverUser() 전에 보관
+            boolean expired = isGracePeriodExpired(originalDeleteDate);
+
+            user.recoverUser();
+            // Apple은 복구 경로에서 email/name 갱신하지 않음 (Apple SDK가 재로그인 시 제공 안 함 — 공식 동작)
+            if (expired) {
+                user.resetForRejoin();
+                log.info("Apple 재가입 — 유예 경과 초기화: socialId={}, originalDeleteDate={}", socialId, originalDeleteDate);
+            } else {
+                log.info("Apple 재가입 — 유예 내 복구: socialId={}, originalDeleteDate={}", socialId, originalDeleteDate);
+            }
+            return user;   // @Transactional 영속 컨텍스트가 변경 자동 반영
+        }
+
+        // 3) 완전 신규 가입
+        return createAppleUser(socialId, email, name);
+    }
+
+    private boolean isGracePeriodExpired(LocalDate deleteDate) {
+        if (deleteDate == null) {
+            log.warn("soft-deleted Apple 사용자의 delete_date가 null — 데이터 정합성 점검 필요. 유예 경과로 간주");
+            return true;
+        }
+        LocalDate today = LocalDate.now(KST);
+        return today.isAfter(deleteDate.plusDays(rejoinGracePeriodDays));
     }
 
     private User createAppleUser(String socialId, String email, String name) {

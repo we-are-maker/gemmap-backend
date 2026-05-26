@@ -191,6 +191,28 @@ public class User {
         this.deleteDate = null;
     }
 
+    /**
+     * 유예 기간(30일) 경과 후 재가입 시 권한·임의 프로필 초기화.
+     * 소셜 리니어블 필드(email, name, gender, ageRange, birthday, birthyear)는 별도 갱신.
+     * 연관 데이터(spot/bookmark/checkin/photo/report)는 본 스코프 외.
+     */
+    public void resetForRejoin() {
+        this.role = ERole.GUEST;
+        this.nickname = null;
+        this.profileImage = Constant.DEFAULT_PROFILE_IMAGE;
+        this.photoConsentAgreedAt = null;
+    }
+
+    /**
+     * 소셜 제공자에서 받은 최신 email로 갱신.
+     * 기존 updateKakaoUserInfo가 email을 다루지 않아 별도 메서드로 분리.
+     */
+    public void updateEmail(String email) {
+        if (email != null && !email.isBlank()) {
+            this.email = email;
+        }
+    }
+
     public void agreeToPhotoConsent() {
         this.photoConsentAgreedAt = LocalDateTime.now(KST);
     }

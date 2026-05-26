@@ -51,6 +51,10 @@ crypto:
     enc-password: ${APPLE_REFRESH_TOKEN_ENC_PASSWORD}
     enc-salt: ${APPLE_REFRESH_TOKEN_ENC_SALT}
 
+# 회원 탈퇴 후 재가입 정책
+withdraw:
+  rejoin-grace-period-days: 30   # 탈퇴 후 N일 이내 재로그인 → 데이터 유지 복구. 경과 시 권한·프로필 초기화
+
 # AWS S3 설정
 s3:
   region:

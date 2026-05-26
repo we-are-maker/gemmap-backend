@@ -25,6 +25,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.security.crypto.encrypt.TextEncryptor;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -50,6 +52,9 @@ import java.util.UUID;
 public class AuthService {
 
     private static final ZoneId KST = ZoneId.of("Asia/Seoul");
+
+    @Value("${withdraw.rejoin-grace-period-days:30}")
+    private int rejoinGracePeriodDays;
 
     private final UserRepository userRepository;
     private final JwtUtil jwtUtil;
@@ -152,27 +157,59 @@ public class AuthService {
             throw new CommonException(ErrorCode.INVALID_INPUT_VALUE);
         }
 
-        try {
-            Optional<User> userOpt = userRepository.findBySocialIdAndProvider(socialId, EProvider.KAKAO);
-
-            if (userOpt.isPresent()) {
-                User existingUser = userOpt.get();
-                // 기존 사용자의 카카오 정보 업데이트
-                updateKakaoUserInfo(existingUser, userInfo);
-                User savedUser = userRepository.save(existingUser);
-                log.info("기존 카카오 사용자 정보 업데이트 - 사용자 ID: {}", savedUser.getId());
-                return savedUser;
-            }
-
-            // 신규 사용자 생성
-            User newUser = createKakaoUser(socialId, email, userInfo);
-            User savedUser = userRepository.save(newUser);
-            log.info("신규 카카오 사용자 생성 - 소셜 ID: {}, 사용자 ID: {}", socialId, savedUser.getId());
-            return savedUser;
-        } catch (Exception e) {
-            log.error("카카오 사용자 처리 중 오류: {}", e.getMessage(), e);
-            throw new CommonException(ErrorCode.DATABASE_ERROR);
+        // 1) 활성 사용자 조회 → 기존 로그인
+        Optional<User> activeUser = userRepository.findBySocialIdAndProvider(socialId, EProvider.KAKAO);
+        if (activeUser.isPresent()) {
+            User existing = activeUser.get();
+            updateKakaoUserInfo(existing, userInfo);
+            User saved = userRepository.save(existing);
+            log.info("기존 카카오 사용자 정보 업데이트 - 사용자 ID: {}", saved.getId());
+            return saved;
         }
+
+        // 2) soft-deleted 사용자 조회 → 재가입 분기
+        Optional<User> softDeleted = userRepository.findSoftDeletedBySocialIdAndProvider(socialId, EProvider.KAKAO);
+        if (softDeleted.isPresent()) {
+            User user = softDeleted.get();
+            LocalDate originalDeleteDate = user.getDeleteDate();   // recoverUser() 전에 보관
+            boolean expired = isGracePeriodExpired(originalDeleteDate);
+
+            user.recoverUser();
+            updateKakaoUserInfo(user, userInfo);   // 소셜 리니어블 최신화 먼저
+
+            if (expired) {
+                user.resetForRejoin();              // 마지막에 권한·임의 프로필 초기화
+                log.info("카카오 재가입 — 유예 경과 초기화: socialId={}, originalDeleteDate={}", socialId, originalDeleteDate);
+            } else {
+                log.info("카카오 재가입 — 유예 내 복구: socialId={}, originalDeleteDate={}", socialId, originalDeleteDate);
+            }
+            return userRepository.save(user);
+        }
+
+        // 3) 완전 신규 가입
+        try {
+            User newUser = createKakaoUser(socialId, email, userInfo);
+            User saved = userRepository.save(newUser);
+            log.info("신규 카카오 사용자 생성 - 소셜 ID: {}, 사용자 ID: {}", socialId, saved.getId());
+            return saved;
+        } catch (DataIntegrityViolationException e) {
+            // 동시 재로그인 충돌 시 재조회로 수렴 (Apple 패턴 일관 적용)
+            log.warn("카카오 사용자 동시 생성 충돌 - socialId: {}. 활성/탈퇴 재조회", socialId);
+            return userRepository.findBySocialIdAndProvider(socialId, EProvider.KAKAO)
+                    .or(() -> userRepository.findSoftDeletedBySocialIdAndProvider(socialId, EProvider.KAKAO))
+                    .orElseThrow(() -> new CommonException(ErrorCode.DATABASE_ERROR));
+        }
+    }
+
+    private boolean isGracePeriodExpired(LocalDate deleteDate) {
+        if (deleteDate == null) {
+            // soft-deleted인데 deleteDate가 NULL인 비정상 상태 → 데이터 정합성 점검 필요
+            // 안전한 fallback: 유예 경과로 간주하여 초기화 처리
+            log.warn("soft-deleted 사용자의 delete_date가 null — 데이터 정합성 점검 필요. 유예 경과로 간주");
+            return true;
+        }
+        LocalDate today = LocalDate.now(KST);
+        return today.isAfter(deleteDate.plusDays(rejoinGracePeriodDays));
     }
 
     /**
@@ -234,6 +271,10 @@ public class AuthService {
                 birthday,
                 birthyear
         );
+
+        // FR-3: 소셜 최신 email 갱신 (기존 updateKakaoUserInfo는 email을 다루지 않음)
+        String email = account != null ? account.getEmail() : null;
+        user.updateEmail(email);
     }
 
     /**
