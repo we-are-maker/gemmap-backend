@@ -1,6 +1,7 @@
 package com.gemmap.gemmap.auth.presentation;
 
 import com.gemmap.gemmap.auth.application.dto.request.AppleLoginRequestDto;
+import com.gemmap.gemmap.auth.application.dto.request.PhotoConsentRequest;
 import com.gemmap.gemmap.auth.application.dto.response.PhotoConsentResponse;
 import com.gemmap.gemmap.auth.application.dto.response.RegisterResponseDto;
 import com.gemmap.gemmap.auth.application.dto.response.SocialLoginResponseDto;
@@ -125,12 +126,16 @@ public class AuthController {
     }
 
     /**
-     * 사진 정보 활용 동의 처리
+     * 사진 정보 활용 동의/철회 처리 (양방향 멱등)
      * POST /api/v1/auth/photo-consent
+     * Body: { "agreed": boolean }  // 필수
      */
     @PostMapping("/photo-consent")
-    public ResponseEntity<PhotoConsentResponse> agreeToPhotoConsent(@UserId Long userId) {
-        return ResponseEntity.ok(authService.agreeToPhotoConsent(userId));
+    public ResponseEntity<PhotoConsentResponse> setPhotoConsent(
+            @UserId Long userId,
+            @Valid @RequestBody PhotoConsentRequest request
+    ) {
+        return ResponseEntity.ok(authService.setPhotoConsent(userId, request.agreed()));
     }
 
     /**
