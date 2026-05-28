@@ -612,17 +612,24 @@ public class AuthService {
     }
 
     /**
-     * 사진 정보 활용 동의 처리 (멱등)
-     * - 미동의 → 동의 처리 후 true 반환
-     * - 기동의 → 추가 처리 없이 true 반환 (409 아님)
+     * 사진 정보 활용 동의/철회 처리 (양방향 멱등).
+     * agreed=true  → 미동의면 시각 기록, 기동의면 시각 보존.
+     * agreed=false → 동의 상태면 시각 null 초기화(철회), 미동의면 변경 없음.
+     * 동일 상태 유지 요청은 no-op 분기로 UPDATE 가 발생하지 않는다.
      */
     @Transactional
-    public PhotoConsentResponse agreeToPhotoConsent(Long userId) {
+    public PhotoConsentResponse setPhotoConsent(Long userId, boolean agreed) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new CommonException(ErrorCode.USER_NOT_FOUND));
 
-        if (!user.hasPhotoConsentAgreed()) {
-            user.agreeToPhotoConsent();
+        if (agreed) {
+            if (!user.hasPhotoConsentAgreed()) {
+                user.agreeToPhotoConsent();
+            }
+        } else {
+            if (user.hasPhotoConsentAgreed()) {
+                user.revokePhotoConsent();
+            }
         }
 
         return PhotoConsentResponse.of(user.hasPhotoConsentAgreed());

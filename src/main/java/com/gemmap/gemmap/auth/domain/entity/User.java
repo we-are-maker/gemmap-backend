@@ -72,6 +72,12 @@ public class User {
     @Column(name = "delete_date")
     private LocalDate deleteDate;
 
+    /**
+     * 사진 정보 활용 동의 시각.
+     * non-null: 동의 상태 (마지막 동의 시점)
+     * null    : 미동의 또는 철회 완료
+     * 단일 필드 정책 — 별도 철회 시각 컬럼 두지 않음. 판정은 {@link #hasPhotoConsentAgreed()}.
+     */
     @Column(name = "photo_consent_agreed_at")
     private LocalDateTime photoConsentAgreedAt;
 
@@ -227,6 +233,16 @@ public class User {
 
     public void agreeToPhotoConsent() {
         this.photoConsentAgreedAt = LocalDateTime.now(KST);
+    }
+
+    /**
+     * 사진 정보 활용 동의 철회.
+     * 단일 필드 정책에 따라 동의 시각을 null 로 초기화한다.
+     * 호출부(SpotService/CheckinService) 의 {@link #hasPhotoConsentAgreed()} 검증식은 무변경 —
+     * 철회 사용자는 photoConsentAgreedAt == null 이 되어 자동 미동의 처리된다.
+     */
+    public void revokePhotoConsent() {
+        this.photoConsentAgreedAt = null;
     }
 
     public boolean hasPhotoConsentAgreed() {
