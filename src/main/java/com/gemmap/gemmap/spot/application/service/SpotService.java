@@ -4,7 +4,6 @@ import com.gemmap.gemmap.auth.domain.entity.User;
 import com.gemmap.gemmap.auth.domain.repository.UserRepository;
 import com.gemmap.gemmap.bookmark.application.service.BookmarkService;
 import com.gemmap.gemmap.checkin.application.service.CheckinService;
-import com.gemmap.gemmap.checkin.domain.repository.SpotCheckinRepository;
 import com.gemmap.gemmap.shared.common.enums.ERecommendationLevel;
 import com.gemmap.gemmap.shared.infrastructure.objectstorage.ObjectStorageService;
 import com.gemmap.gemmap.shared.infrastructure.objectstorage.S3PresignedUrlService;
@@ -28,6 +27,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.math.BigDecimal;
@@ -143,39 +144,52 @@ public class SpotService {
     }
 
     /**
-     * 스팟 삭제 (DB 우선 삭제 후 Object Storage 삭제)
+     * 스팟 삭제
      *
-     * @param userId 요청 사용자 ID
-     * @param spotId 삭제할 스팟 ID
+     * DB 자식 데이터는 FK ON DELETE CASCADE로 정리되며, S3 객체는 트랜잭션 커밋 성공 후 삭제한다.
      */
     @Transactional
     public void delete(Long userId, Long spotId) {
-        // 1) 사용자 조회
-        User user = userRepository.findById(userId)
+        // 1) 사용자 존재 검증 — 토큰 잔존 등의 비정상 케이스 방어 (반환 객체는 사용하지 않음)
+        userRepository.findById(userId)
                 .orElseThrow(() -> new CommonException(ErrorCode.USER_NOT_FOUND));
 
         // 2) Spot 존재 확인
         Spot spot = spotRepository.findById(spotId)
             .orElseThrow(() -> new CommonException(ErrorCode.SPOT_NOT_FOUND));
 
-        // 3) 소유권 검증
-        if (!spot.getUser().equals(user)) {
+        // 3) 소유권 검증 — ID 비교로 영속성 컨텍스트 1차 캐시 의존을 제거.
+        //    spot.getUser()는 LAZY 프록시지만 getId()는 프록시 초기화 없이 식별자 반환
+        //    (Hibernate AbstractLazyInitializer 동작).
+        if (!spot.getUser().getId().equals(userId)) {
             throw new CommonException(ErrorCode.ACCESS_DENIED, "해당 스팟을 삭제할 권한이 없습니다.");
         }
 
-        // 4) 연결된 SpotPhoto 조회 (S3 key 추출용)
-        List<SpotPhoto> photos = spotPhotoRepository.findBySpot(spot);
-        List<String> keys = photos.stream()
-            .map(SpotPhoto::getFileUrl)
-            .toList();
+        // 4) S3 키 목록만 수집 (entity는 영속성 컨텍스트에 올리지 않음)
+        List<String> keys = spotPhotoRepository.findFileUrlsBySpot(spotId);
 
-        // 5) DB 삭제
+        // 5) DB 삭제 — 자식 4종은 FK ON DELETE CASCADE로 자동 정리됨
         spotRepository.delete(spot);
 
-        // 6) Object Storage 삭제 (트랜잭션 외부, 베스트 에포트)
-        for (String key : keys) {
-            S3FileUtils.safeDelete(objectStorageService, s3Properties, key);
+        // 6) S3 객체 삭제는 트랜잭션 commit 성공 후에만 수행 (rollback 시 S3 객체 보존)
+        if (!keys.isEmpty()) {
+            registerS3CleanupAfterCommit(keys);
         }
+    }
+
+    /**
+     * 트랜잭션 커밋 성공 후 S3 객체 삭제 콜백을 등록한다.
+     * 삭제 실패는 safeDelete 내부에서 처리되므로 응답 흐름에 영향을 주지 않는다.
+     */
+    private void registerS3CleanupAfterCommit(List<String> keys) {
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                for (String key : keys) {
+                    S3FileUtils.safeDelete(objectStorageService, s3Properties, key);
+                }
+            }
+        });
     }
 
     /**
