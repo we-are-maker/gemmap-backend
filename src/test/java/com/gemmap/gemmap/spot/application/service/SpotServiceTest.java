@@ -13,6 +13,7 @@ import com.gemmap.gemmap.spot.domain.entity.Spot;
 import com.gemmap.gemmap.spot.domain.entity.SpotPhoto;
 import com.gemmap.gemmap.spot.domain.repository.SpotPhotoRepository;
 import com.gemmap.gemmap.spot.domain.repository.SpotRepository;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -23,8 +24,11 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -236,6 +240,126 @@ class SpotServiceTest {
 
             verify(spotFileValidator, never()).validateImage(any());
             verify(objectStorageService, never()).upload(anyString(), anyString(), any());
+        }
+    }
+
+    // =====================================================================
+    // 스팟 삭제 검증 — TransientObjectException 해소 + DB FK CASCADE + afterCommit
+    // =====================================================================
+
+    @Nested
+    @DisplayName("스팟 삭제")
+    class DeleteTests {
+
+        private static final Long TEST_SPOT_ID = 100L;
+        private static final String S3_KEY_1 = "dev/spots/2026/05/uuid-1.jpg";
+        private static final String S3_KEY_2 = "dev/spots/2026/05/uuid-2.jpg";
+
+        @BeforeEach
+        void initTxSync() {
+            // 트랜잭션 동기화 라이프사이클을 테스트에서 직접 관리
+            // (실제 트랜잭션 없이 registerSynchronization 호출만 캡처)
+            if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+                TransactionSynchronizationManager.initSynchronization();
+            }
+        }
+
+        @AfterEach
+        void clearTxSync() {
+            if (TransactionSynchronizationManager.isSynchronizationActive()) {
+                TransactionSynchronizationManager.clearSynchronization();
+            }
+        }
+
+        @Test
+        @DisplayName("스팟 삭제 → projection 호출 + Spot 삭제 + afterCommit 동기화 등록")
+        void delete_shouldCallProjectionAndDeleteSpotAndRegisterAfterCommit() {
+            // Given
+            Spot spot = mock(Spot.class);
+            given(userRepository.findById(TEST_USER_ID)).willReturn(Optional.of(testUser));
+            given(spotRepository.findById(TEST_SPOT_ID)).willReturn(Optional.of(spot));
+            given(spot.getUser()).willReturn(testUser);
+            given(spotPhotoRepository.findFileUrlsBySpot(TEST_SPOT_ID))
+                .willReturn(List.of(S3_KEY_1, S3_KEY_2));
+
+            // When
+            spotService.delete(TEST_USER_ID, TEST_SPOT_ID);
+
+            // Then
+            verify(spotPhotoRepository).findFileUrlsBySpot(TEST_SPOT_ID);
+            verify(spotPhotoRepository, never()).findBySpot(any());  // 기존 메서드는 호출되지 않아야 함
+            verify(spotRepository).delete(spot);
+
+            // afterCommit 발동 전에는 S3 호출 없음
+            verify(objectStorageService, never()).delete(anyString(), anyString());
+
+            // 동기화가 등록되었는지 확인 + 직접 afterCommit 트리거
+            List<TransactionSynchronization> syncs =
+                TransactionSynchronizationManager.getSynchronizations();
+            assertThat(syncs).hasSize(1);
+            given(s3Properties.getBucket()).willReturn(TEST_BUCKET);
+            syncs.get(0).afterCommit();
+
+            // afterCommit 후 S3 키마다 베스트 에포트 삭제 호출 확인
+            verify(objectStorageService).delete(TEST_BUCKET, S3_KEY_1);
+            verify(objectStorageService).delete(TEST_BUCKET, S3_KEY_2);
+        }
+
+        @Test
+        @DisplayName("S3 키가 없으면 afterCommit 동기화 등록도 안 됨")
+        void delete_whenNoPhotos_shouldNotRegisterAfterCommit() {
+            // Given
+            Spot spot = mock(Spot.class);
+            given(userRepository.findById(TEST_USER_ID)).willReturn(Optional.of(testUser));
+            given(spotRepository.findById(TEST_SPOT_ID)).willReturn(Optional.of(spot));
+            given(spot.getUser()).willReturn(testUser);
+            given(spotPhotoRepository.findFileUrlsBySpot(TEST_SPOT_ID)).willReturn(List.of());
+
+            // When
+            spotService.delete(TEST_USER_ID, TEST_SPOT_ID);
+
+            // Then
+            verify(spotRepository).delete(spot);
+            assertThat(TransactionSynchronizationManager.getSynchronizations()).isEmpty();
+            verify(objectStorageService, never()).delete(anyString(), anyString());
+        }
+
+        @Test
+        @DisplayName("사용자를 찾을 수 없으면 USER_NOT_FOUND 예외, Spot 조회·삭제 모두 호출되지 않음")
+        void delete_whenUserNotFound_shouldThrowUserNotFound() {
+            // Given
+            given(userRepository.findById(TEST_USER_ID)).willReturn(Optional.empty());
+
+            // When & Then
+            assertThatThrownBy(() -> spotService.delete(TEST_USER_ID, TEST_SPOT_ID))
+                .isInstanceOf(CommonException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.USER_NOT_FOUND);
+
+            verify(spotRepository, never()).findById(anyLong());
+            verify(spotRepository, never()).delete(any());
+            verify(spotPhotoRepository, never()).findFileUrlsBySpot(anyLong());
+            assertThat(TransactionSynchronizationManager.getSynchronizations()).isEmpty();
+        }
+
+        @Test
+        @DisplayName("다른 사용자의 스팟 삭제 시도 시 ACCESS_DENIED 예외, Spot 삭제는 호출되지 않음")
+        void delete_whenNotOwner_shouldThrowAccessDenied() {
+            // Given
+            User otherOwner = mock(User.class);
+            Spot spot = mock(Spot.class);
+            given(userRepository.findById(TEST_USER_ID)).willReturn(Optional.of(testUser));
+            given(spotRepository.findById(TEST_SPOT_ID)).willReturn(Optional.of(spot));
+            given(spot.getUser()).willReturn(otherOwner);
+            given(otherOwner.getId()).willReturn(TEST_USER_ID + 999L);  // 다른 ID로 명시 stub (mock default null 회피)
+
+            // When & Then
+            assertThatThrownBy(() -> spotService.delete(TEST_USER_ID, TEST_SPOT_ID))
+                .isInstanceOf(CommonException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.ACCESS_DENIED);
+
+            verify(spotRepository, never()).delete(any());
+            verify(spotPhotoRepository, never()).findFileUrlsBySpot(anyLong());
+            assertThat(TransactionSynchronizationManager.getSynchronizations()).isEmpty();
         }
     }
 }

@@ -6,12 +6,22 @@ import com.gemmap.gemmap.spot.domain.entity.Spot;
 import com.gemmap.gemmap.spot.domain.entity.SpotPhoto;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 import java.util.Optional;
 
 public interface SpotPhotoRepository extends JpaRepository<SpotPhoto, Long> {
     List<SpotPhoto> findBySpot(Spot spot);
+
+    /**
+     * 특정 스팟에 속한 모든 SpotPhoto의 fileUrl(S3 키)만 조회한다.
+     *
+     * SpotPhoto 엔티티를 영속성 컨텍스트에 로드하지 않기 위한 projection 쿼리다.
+     * 스팟 삭제 시 S3 객체 정리를 위한 키 수집 용도로만 사용한다.
+     */
+    @Query("select sp.fileUrl from SpotPhoto sp where sp.spot.id = :spotId")
+    List<String> findFileUrlsBySpot(@Param("spotId") Long spotId);
 
     /**
      * 특정 스팟의 type이 SPOT인 대표 사진 조회 (최신 1건)
