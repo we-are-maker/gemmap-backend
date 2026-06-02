@@ -81,7 +81,8 @@ public class AppleLoginTransactionService {
                 user.resetForRejoin();
                 log.info("Apple 재가입 — 유예 경과 초기화: socialId={}, originalDeleteDate={}", socialId, originalDeleteDate);
             } else {
-                log.info("Apple 재가입 — 유예 내 복구: socialId={}, originalDeleteDate={}", socialId, originalDeleteDate);
+                user.updateRole(ERole.GUEST);       // 유예 내 재가입도 회원가입 화면 재진입(role만 리셋, 그 외 데이터 보존)
+                log.info("Apple 재가입 — 유예 내 복구(GUEST 리셋): socialId={}, originalDeleteDate={}", socialId, originalDeleteDate);
             }
             return user;   // @Transactional 영속 컨텍스트가 변경 자동 반영
         }
