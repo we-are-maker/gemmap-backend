@@ -59,5 +59,6 @@ s3:
   checkin-base-path: "test/checkins/"
 
 # 회원 탈퇴 후 재가입 정책 (테스트용)
+# 실서비스 전 임시: 유예기간 사실상 무한대 → 경과 분기(resetForRejoin) 미도달. 실서비스 전환 시 30으로 복구.
 withdraw:
-  rejoin-grace-period-days: 30
+  rejoin-grace-period-days: 36500
