@@ -53,7 +53,10 @@ crypto:
 
 # 회원 탈퇴 후 재가입 정책
 withdraw:
-  rejoin-grace-period-days: 30   # 탈퇴 후 N일 이내 재로그인 → 데이터 유지 복구. 경과 시 권한·프로필 초기화
+  # 탈퇴 후 N일 이내 재로그인 → 데이터 유지 복구(role=GUEST 리셋). 경과 시 resetForRejoin() 완전 초기화.
+  # [테스트용/임시] 실서비스 전 사용자 완전 탈퇴(데이터 초기화)가 실행되지 않도록 유예기간을 사실상 무한대(약 100년)로 둔다.
+  # → isGracePeriodExpired()가 항상 false → 경과 분기(resetForRejoin) 미도달. 실서비스 전환 시 30으로 복구.
+  rejoin-grace-period-days: 36500
 
 # AWS S3 설정
 s3:
