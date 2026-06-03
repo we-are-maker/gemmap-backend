@@ -135,18 +135,22 @@ class ReportServiceTest {
         }
 
         @Test
-        @DisplayName("OTHER 사유에 content가 없으면 REPORT_CONTENT_REQUIRED 예외")
-        void createReport_blankOtherContentThrowsBadRequest() {
+        @DisplayName("OTHER 사유에 content가 없으면 null로 저장한다")
+        void createReport_blankOtherContentSavesNull() {
             mockUserAndSpotFound();
             given(spotReportRepository.existsByUserAndSpot(user, spot)).willReturn(false);
 
-            assertThatThrownBy(() -> reportService.createReport(
+            ArgumentCaptor<SpotReport> reportCaptor = ArgumentCaptor.forClass(SpotReport.class);
+            given(spotReportRepository.save(reportCaptor.capture()))
+                    .willAnswer(invocation -> invocation.getArgument(0));
+
+            reportService.createReport(
                     TEST_USER_ID,
                     TEST_SPOT_ID,
                     new SpotReportRequest(EReportReason.OTHER, "   ")
-            ))
-                    .isInstanceOf(CommonException.class)
-                    .hasFieldOrPropertyWithValue("errorCode", ErrorCode.REPORT_CONTENT_REQUIRED);
+            );
+
+            assertThat(reportCaptor.getValue().getContent()).isNull();
         }
 
         @Test
