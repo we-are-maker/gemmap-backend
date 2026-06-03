@@ -182,6 +182,7 @@ public class User {
         this.deleteDate = LocalDate.now(KST);
         this.refreshToken = null;
         this.isLogin = false;
+        this.role = ERole.GUEST;   // 탈퇴 시 권한을 GUEST로 강등 → 재로그인 시 회원가입 화면 재진입
     }
 
     public void updateAppleRefreshToken(String encryptedRefreshToken) {
