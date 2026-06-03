@@ -53,7 +53,7 @@ public class ReportService {
                 .user(user)
                 .spot(spot)
                 .reason(request.reason())
-                .content(validateAndNormalizeContent(request.reason(), request.content()))
+                .content(normalizeContent(request.reason(), request.content()))
                 .build();
 
         try {
@@ -64,20 +64,14 @@ public class ReportService {
     }
 
     /**
-     * 신고 사유에 맞는 content 필수 여부와 저장값 형식을 함께 정리한다.
+     * 신고 사유에 맞는 저장용 content를 정리한다.
+     * OTHER 사유 + 내용이 있을 때만 trim 후 저장하고, 그 외에는 null로 정리한다.
+     * (OTHER 사유라도 내용은 선택 사항이다.)
      */
-    private String validateAndNormalizeContent(EReportReason reason, String content) {
-        // OTHER가 아닌 사유
-        if (reason != EReportReason.OTHER) {
-            return null; // content를 항상 null로 반환
+    private String normalizeContent(EReportReason reason, String content) {
+        if (reason != EReportReason.OTHER || !StringUtils.hasText(content)) {
+            return null;
         }
-
-        // OTHER 사유 + content 없음(null / 빈 문자열 / 공백만)
-        if (!StringUtils.hasText(content)) {
-            throw new CommonException(ErrorCode.REPORT_CONTENT_REQUIRED);
-        }
-
-        // OTHER 사유 + content 있음
         return content.trim();
     }
 }
