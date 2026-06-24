@@ -102,10 +102,9 @@ public class AppleLoginTransactionService {
                 .name(name)
                 .nickname(null)
                 .profileImage(null)
-                .gender(null)
+                .gender(null)     // EGender: 애플은 성별 미제공, null 유지
                 .ageRange(null)
-                .birthday(null)
-                .birthyear(null)
+                .birthDate(null)  // LocalDate: 애플은 생년월일 미제공, null 유지
                 .build();
 
         try {
