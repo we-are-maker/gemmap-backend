@@ -158,14 +158,14 @@ public class AuthService {
             throw new CommonException(ErrorCode.INVALID_INPUT_VALUE);
         }
 
-        // 1) 활성 사용자 조회 → 기존 로그인
+        // 1) 활성 사용자 조회 → 소셜 정보 재갱신 없이 그대로 반환
+        // 활성 재로그인에서는 소셜 정보 재갱신 없음.
+        // USER: register에서 확정한 값 보호 / GUEST: 최종 저장은 register 책임
         Optional<User> activeUser = userRepository.findBySocialIdAndProvider(socialId, EProvider.KAKAO);
         if (activeUser.isPresent()) {
             User existing = activeUser.get();
-            updateKakaoUserInfo(existing, userInfo);
-            User saved = userRepository.save(existing);
-            log.info("기존 카카오 사용자 정보 업데이트 - 사용자 ID: {}", saved.getId());
-            return saved;
+            log.info("기존 카카오 사용자 재로그인 - 사용자 ID: {}, 권한: {}", existing.getId(), existing.getRole());
+            return existing;
         }
 
         // 2) soft-deleted 사용자 조회 → 재가입 분기
@@ -179,10 +179,8 @@ public class AuthService {
             boolean expired = user.isGracePeriodExpired(rejoinGracePeriodDays);
 
             user.recoverUser();
-            updateKakaoUserInfo(user, userInfo);   // 소셜 리니어블 최신화 먼저
-
             if (expired) {
-                user.resetForRejoin();              // 마지막에 권한·임의 프로필 초기화
+                user.resetForRejoin();
                 log.info("카카오 재가입 — 유예 경과 초기화: socialId={}, originalDeleteDate={}", socialId, originalDeleteDate);
             } else {
                 log.info("카카오 재가입 — 유예 내 복구: socialId={}, originalDeleteDate={}", socialId, originalDeleteDate);
@@ -235,37 +233,6 @@ public class AuthService {
                 .ageRange(ageRange)
                 .birthDate(birthDate)
                 .build();
-    }
-
-    /**
-     * 기존 카카오 사용자 정보 업데이트
-     */
-    private void updateKakaoUserInfo(User user, KakaoUserInfoResponse userInfo) {
-        KakaoUserInfoResponse.KakaoAccount account = userInfo.getKakaoAccount();
-
-        String name = extractName(userInfo);
-        String nickname = extractNickname(userInfo);
-        String profileImage = extractProfileImage(userInfo);
-        // 변환 규칙은 createKakaoUser와 동일 (둘 다 존재 시에만 birth_date 저장)
-        EGender gender = EGender.fromKakao(extractGender(userInfo));
-        String ageRange = extractAgeRange(userInfo);
-        LocalDate birthDate = User.toBirthDate(extractBirthday(userInfo), extractBirthyear(userInfo));
-
-        // USER: register에서 확정한 gender/birthDate를 카카오 재로그인으로 덮어쓰지 않는다.
-        // 프리필 목적의 소셜 최신화는 GUEST(미등록) 시점에서만 의미 있다.
-        if (user.getRole() == ERole.USER) {
-            gender = user.getGender();
-            birthDate = user.getBirthDate();
-        }
-
-        log.info("기존 카카오 사용자 정보 업데이트 준비 - UserID: {}, Name: {}, Nickname: {}, Gender: {}, AgeRange: {}, BirthDate: {}",
-                user.getId(), name, nickname, gender, ageRange, birthDate);
-
-        user.updateKakaoUserInfo(name, nickname, profileImage, gender, ageRange, birthDate);
-
-        // 소셜 최신 email 갱신 (기존 updateKakaoUserInfo는 email을 다루지 않음)
-        String email = account != null ? account.getEmail() : null;
-        user.updateEmail(email);
     }
 
     /**
@@ -397,10 +364,13 @@ public class AuthService {
                 throw new CommonException(ErrorCode.ALREADY_REGISTERED_USER);
             }
 
-            // 4. 닉네임 처리 (입력하지 않은 경우 기존 유지)
+            // 4. 닉네임 처리 (입력하지 않은 경우 기존 유지, 최종 null/blank 이면 예외)
             String finalNickname = (nickname != null && !nickname.trim().isEmpty())
                     ? nickname
                     : user.getNickname();
+            if (finalNickname == null || finalNickname.trim().isEmpty()) {
+                throw new CommonException(ErrorCode.INVALID_INPUT_VALUE, "닉네임은 필수 입력 값입니다.");
+            }
 
             // 5. 프로필 이미지 처리 (파일 미전송 시 기존 유지)
             String finalProfileImage = user.getProfileImage();
@@ -410,6 +380,9 @@ public class AuthService {
 
             // 6. 사용자 정보 업데이트 (uniform null=keep) — nickname/birthDate/gender/profileImage 순
             user.updateNickname(finalNickname);
+            if (birthDate != null && birthDate.isAfter(LocalDate.now(KST))) {
+                throw new CommonException(ErrorCode.INVALID_INPUT_VALUE, "생년월일은 미래 날짜일 수 없습니다.");
+            }
             user.updateBirthDate(birthDate);   // null이면 기존 유지
             user.updateGender(gender);         // null이면 기존 유지
             user.updateProfileImage(finalProfileImage);

@@ -157,19 +157,6 @@ public class User {
         this.profileImage = profileImage;
     }
 
-    public void updateKakaoUserInfo(String name, String nickname, String profileImage,
-                                    EGender gender, String ageRange, LocalDate birthDate) {
-        if (name != null) this.name = name;
-        if (nickname != null) this.nickname = nickname;
-        if (profileImage != null) this.profileImage = profileImage;
-        // 소셜 최신화: null도 그대로 반영한다.
-        // 카카오 동의 철회 시 null이 내려오면 DB도 null로 덮어써야 오래된 개인정보가 프리필에 잔존하지 않는다.
-        // ※ register 시 사용자 미입력(null=keep)과 구분: null=keep은 updateBirthDate/updateGender 전용.
-        this.gender = gender;
-        if (ageRange != null) this.ageRange = ageRange;
-        this.birthDate = birthDate;
-    }
-
     /**
      * 로그아웃 처리
      * - 로그인 상태를 false로 변경
@@ -202,14 +189,16 @@ public class User {
     }
 
     /**
-     * 유예 기간(30일) 경과 후 재가입 시 권한·임의 프로필 초기화.
-     * 소셜 리니어블 필드(email, name, gender, ageRange, birthDate)는 별도 갱신.
+     * 유예 기간(30일) 경과 후 재가입 시 회원가입 화면에 노출될 프로필성 정보를 초기화.
      * 연관 데이터(spot/bookmark/checkin/photo/report)는 본 스코프 외.
      */
     public void resetForRejoin() {
         this.role = ERole.GUEST;
         this.nickname = null;
         this.profileImage = Constant.DEFAULT_PROFILE_IMAGE;
+        this.gender = null;
+        this.ageRange = null;
+        this.birthDate = null;
         this.photoConsentAgreedAt = null;
     }
 
@@ -236,7 +225,7 @@ public class User {
 
     /**
      * 회원가입 시 생년월일 갱신 (null=keep).
-     * 소셜 최신화({@link #updateKakaoUserInfo})와 달리 사용자가 미입력하면 기존값 유지.
+     * 사용자가 미입력하면 기존값 유지.
      */
     public void updateBirthDate(LocalDate birthDate) {
         if (birthDate != null) {
@@ -246,21 +235,11 @@ public class User {
 
     /**
      * 회원가입 시 성별 갱신 (null=keep).
-     * 소셜 최신화({@link #updateKakaoUserInfo})와 달리 사용자가 미입력하면 기존값 유지.
+     * 사용자가 미입력하면 기존값 유지.
      */
     public void updateGender(EGender gender) {
         if (gender != null) {
             this.gender = gender;
-        }
-    }
-
-    /**
-     * 소셜 제공자에서 받은 최신 email로 갱신.
-     * 기존 updateKakaoUserInfo가 email을 다루지 않아 별도 메서드로 분리.
-     */
-    public void updateEmail(String email) {
-        if (email != null && !email.isBlank()) {
-            this.email = email;
         }
     }
 
