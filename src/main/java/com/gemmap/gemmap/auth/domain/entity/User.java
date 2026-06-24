@@ -1,9 +1,11 @@
 package com.gemmap.gemmap.auth.domain.entity;
 
 import com.gemmap.gemmap.shared.common.constants.Constant;
+import com.gemmap.gemmap.shared.common.enums.EGender;
 import com.gemmap.gemmap.shared.common.enums.EProvider;
 import com.gemmap.gemmap.shared.common.enums.ERole;
 import jakarta.persistence.*;
+import org.hibernate.annotations.Comment;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -99,21 +101,21 @@ public class User {
     private String profileImage;
 
     @Column(name = "gender")
-    private String gender;
+    @Enumerated(EnumType.STRING)
+    @Comment("소셜 임포트 후 EGender 정규화 값(MALE/FEMALE)")
+    private EGender gender;
 
     @Column(name = "age_range")
     private String ageRange;
 
-    @Column(name = "birthday")
-    private String birthday;
-
-    @Column(name = "birthyear")
-    private String birthyear;
+    @Column(name = "birth_date")
+    @Comment("소셜 로그인 시 birthyear/birthday 변환 저장 + 회원가입 시 사용자가 수정/확정하는 생년월일")
+    private LocalDate birthDate;
 
     @Builder
     public User(String socialId, EProvider eProvider, ERole role, String email, String name,
-                String nickname, String profileImage, String gender, String ageRange,
-                String birthday, String birthyear) {
+                String nickname, String profileImage, EGender gender, String ageRange,
+                LocalDate birthDate) {
         this.socialId = socialId;
         this.eProvider = eProvider;
         this.role = role;
@@ -126,8 +128,7 @@ public class User {
         this.profileImage = profileImage != null ? profileImage : Constant.DEFAULT_PROFILE_IMAGE;
         this.gender = gender;
         this.ageRange = ageRange;
-        this.birthday = birthday;
-        this.birthyear = birthyear;
+        this.birthDate = birthDate;
     }
 
     public void updateNickname(String nickname) {
@@ -154,17 +155,6 @@ public class User {
 
     public void updateProfileImage(String profileImage) {
         this.profileImage = profileImage;
-    }
-
-    public void updateKakaoUserInfo(String name, String nickname, String profileImage,
-                                    String gender, String ageRange, String birthday, String birthyear) {
-        if (name != null) this.name = name;
-        if (nickname != null) this.nickname = nickname;
-        if (profileImage != null) this.profileImage = profileImage;
-        if (gender != null) this.gender = gender;
-        if (ageRange != null) this.ageRange = ageRange;
-        if (birthday != null) this.birthday = birthday;
-        if (birthyear != null) this.birthyear = birthyear;
     }
 
     /**
@@ -199,24 +189,57 @@ public class User {
     }
 
     /**
-     * 유예 기간(30일) 경과 후 재가입 시 권한·임의 프로필 초기화.
-     * 소셜 리니어블 필드(email, name, gender, ageRange, birthday, birthyear)는 별도 갱신.
+     * 유예 기간(30일) 경과 후 재가입 시 회원가입 화면에 노출될 프로필성 정보를 초기화.
      * 연관 데이터(spot/bookmark/checkin/photo/report)는 본 스코프 외.
      */
     public void resetForRejoin() {
         this.role = ERole.GUEST;
         this.nickname = null;
         this.profileImage = Constant.DEFAULT_PROFILE_IMAGE;
+        this.gender = null;
+        this.ageRange = null;
+        this.birthDate = null;
         this.photoConsentAgreedAt = null;
     }
 
     /**
-     * 소셜 제공자에서 받은 최신 email로 갱신.
-     * 기존 updateKakaoUserInfo가 email을 다루지 않아 별도 메서드로 분리.
+     * 카카오 birthday(MMDD) + birthyear(YYYY) → LocalDate 변환.
+     * birth_date 불변식: 둘 다 존재할 때만 변환하고, 그 외(연도 미동의·생일 미동의·변환 불가 조합)는 null.
+     * birthday_type은 별도 반영하지 않는다(부정확하면 사용자가 회원가입 화면에서 수정).
      */
-    public void updateEmail(String email) {
-        if (email != null && !email.isBlank()) {
-            this.email = email;
+    public static LocalDate toBirthDate(String birthday, String birthyear) {
+        // 둘 다 4자리 숫자여야 변환. 한쪽이라도 누락/비정상 → null.
+        if (birthday == null || birthyear == null
+                || !birthday.matches("\\d{4}") || !birthyear.matches("\\d{4}")) {
+            return null;
+        }
+        try {
+            int year = Integer.parseInt(birthyear);
+            int month = Integer.parseInt(birthday.substring(0, 2));
+            int day = Integer.parseInt(birthday.substring(2, 4));
+            return LocalDate.of(year, month, day);   // 평년 0229 등 불가 조합은 예외 → null
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    /**
+     * 회원가입 시 생년월일 갱신 (null=keep).
+     * 사용자가 미입력하면 기존값 유지.
+     */
+    public void updateBirthDate(LocalDate birthDate) {
+        if (birthDate != null) {
+            this.birthDate = birthDate;
+        }
+    }
+
+    /**
+     * 회원가입 시 성별 갱신 (null=keep).
+     * 사용자가 미입력하면 기존값 유지.
+     */
+    public void updateGender(EGender gender) {
+        if (gender != null) {
+            this.gender = gender;
         }
     }
 

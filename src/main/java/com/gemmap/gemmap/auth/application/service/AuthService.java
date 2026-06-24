@@ -5,8 +5,9 @@ import com.gemmap.gemmap.auth.application.dto.apple.AppleTokenResponse;
 import com.gemmap.gemmap.auth.application.dto.kakao.KakaoAccessTokenInfoResponse;
 import com.gemmap.gemmap.auth.application.dto.kakao.KakaoUserInfoResponse;
 import com.gemmap.gemmap.auth.application.dto.response.PhotoConsentResponse;
-import com.gemmap.gemmap.auth.application.dto.response.RegisterResponseDto;
+import com.gemmap.gemmap.auth.application.dto.response.RegisterProfileResponseDto;
 import com.gemmap.gemmap.auth.application.dto.response.SocialLoginResponseDto;
+import com.gemmap.gemmap.shared.common.enums.EGender;
 import com.gemmap.gemmap.auth.domain.entity.User;
 import com.gemmap.gemmap.auth.domain.repository.UserRepository;
 import com.gemmap.gemmap.auth.infrastructure.jwt.JwtTokenDto;
@@ -157,14 +158,14 @@ public class AuthService {
             throw new CommonException(ErrorCode.INVALID_INPUT_VALUE);
         }
 
-        // 1) 활성 사용자 조회 → 기존 로그인
+        // 1) 활성 사용자 조회 → 소셜 정보 재갱신 없이 그대로 반환
+        // 활성 재로그인에서는 소셜 정보 재갱신 없음.
+        // USER: register에서 확정한 값 보호 / GUEST: 최종 저장은 register 책임
         Optional<User> activeUser = userRepository.findBySocialIdAndProvider(socialId, EProvider.KAKAO);
         if (activeUser.isPresent()) {
             User existing = activeUser.get();
-            updateKakaoUserInfo(existing, userInfo);
-            User saved = userRepository.save(existing);
-            log.info("기존 카카오 사용자 정보 업데이트 - 사용자 ID: {}", saved.getId());
-            return saved;
+            log.info("기존 카카오 사용자 재로그인 - 사용자 ID: {}, 권한: {}", existing.getId(), existing.getRole());
+            return existing;
         }
 
         // 2) soft-deleted 사용자 조회 → 재가입 분기
@@ -178,10 +179,8 @@ public class AuthService {
             boolean expired = user.isGracePeriodExpired(rejoinGracePeriodDays);
 
             user.recoverUser();
-            updateKakaoUserInfo(user, userInfo);   // 소셜 리니어블 최신화 먼저
-
             if (expired) {
-                user.resetForRejoin();              // 마지막에 권한·임의 프로필 초기화
+                user.resetForRejoin();
                 log.info("카카오 재가입 — 유예 경과 초기화: socialId={}, originalDeleteDate={}", socialId, originalDeleteDate);
             } else {
                 log.info("카카오 재가입 — 유예 내 복구: socialId={}, originalDeleteDate={}", socialId, originalDeleteDate);
@@ -210,18 +209,17 @@ public class AuthService {
      * 신규 사용자는 GUEST 권한으로 생성
      */
     private User createKakaoUser(String socialId, String email, KakaoUserInfoResponse userInfo) {
-        KakaoUserInfoResponse.KakaoAccount account = userInfo.getKakaoAccount();
-
         String name = extractName(userInfo);
         String nickname = extractNickname(userInfo);
         String profileImage = extractProfileImage(userInfo);
-        String gender = extractGender(userInfo);
+        // gender는 EGender로 정규화. birth_date는 birthday(MMDD)+birthyear(YYYY)가
+        //        모두 있을 때만 LocalDate로 변환하고, 그 외(부분 동의·미동의·변환 불가)는 null.
+        EGender gender = EGender.fromKakao(extractGender(userInfo));
         String ageRange = extractAgeRange(userInfo);
-        String birthday = extractBirthday(userInfo);
-        String birthyear = extractBirthyear(userInfo);
+        LocalDate birthDate = User.toBirthDate(extractBirthday(userInfo), extractBirthyear(userInfo));
 
-        log.info("신규 카카오 사용자 생성 준비 - Email: {}, Name: {}, Nickname: {}, Gender: {}, AgeRange: {}, Birthday: {}, Birthyear: {}",
-                email, name, nickname, gender, ageRange, birthday, birthyear);
+        log.info("신규 카카오 사용자 생성 준비 - Email: {}, Name: {}, Nickname: {}, Gender: {}, AgeRange: {}, BirthDate: {}",
+                email, name, nickname, gender, ageRange, birthDate);
 
         return User.builder()
                 .socialId(socialId)
@@ -233,41 +231,8 @@ public class AuthService {
                 .profileImage(profileImage)
                 .gender(gender)
                 .ageRange(ageRange)
-                .birthday(birthday)
-                .birthyear(birthyear)
+                .birthDate(birthDate)
                 .build();
-    }
-
-    /**
-     * 기존 카카오 사용자 정보 업데이트
-     */
-    private void updateKakaoUserInfo(User user, KakaoUserInfoResponse userInfo) {
-        KakaoUserInfoResponse.KakaoAccount account = userInfo.getKakaoAccount();
-
-        String name = extractName(userInfo);
-        String nickname = extractNickname(userInfo);
-        String profileImage = extractProfileImage(userInfo);
-        String gender = extractGender(userInfo);
-        String ageRange = extractAgeRange(userInfo);
-        String birthday = extractBirthday(userInfo);
-        String birthyear = extractBirthyear(userInfo);
-
-        log.info("기존 카카오 사용자 정보 업데이트 준비 - UserID: {}, Name: {}, Nickname: {}, Gender: {}, AgeRange: {}, Birthday: {}, Birthyear: {}",
-                user.getId(), name, nickname, gender, ageRange, birthday, birthyear);
-
-        user.updateKakaoUserInfo(
-                name,
-                nickname,
-                profileImage,
-                gender,
-                ageRange,
-                birthday,
-                birthyear
-        );
-
-        // FR-3: 소셜 최신 email 갱신 (기존 updateKakaoUserInfo는 email을 다루지 않음)
-        String email = account != null ? account.getEmail() : null;
-        user.updateEmail(email);
     }
 
     /**
@@ -382,7 +347,8 @@ public class AuthService {
      * 닉네임과 프로필 이미지를 업데이트하고 권한을 USER로 변경
      */
     @Transactional
-    public RegisterResponseDto register(Long userId, String nickname, MultipartFile profileImage) {
+    public SocialLoginResponseDto register(Long userId, String nickname, LocalDate birthDate,
+                                           EGender gender, MultipartFile profileImage) {
         try {
             // 1. 사용자 조회
             User user = userRepository.findById(userId)
@@ -398,20 +364,27 @@ public class AuthService {
                 throw new CommonException(ErrorCode.ALREADY_REGISTERED_USER);
             }
 
-            // 4. 닉네임 처리 (입력하지 않은 경우 카카오 닉네임 유지)
+            // 4. 닉네임 처리 (입력하지 않은 경우 기존 유지, 최종 null/blank 이면 예외)
             String finalNickname = (nickname != null && !nickname.trim().isEmpty())
                     ? nickname
                     : user.getNickname();
+            if (finalNickname == null || finalNickname.trim().isEmpty()) {
+                throw new CommonException(ErrorCode.INVALID_INPUT_VALUE, "닉네임은 필수 입력 값입니다.");
+            }
 
-            // 5. 프로필 이미지 처리 (입력하지 않은 경우 카카오 프로필 이미지 유지)
+            // 5. 프로필 이미지 처리 (파일 미전송 시 기존 유지)
             String finalProfileImage = user.getProfileImage();
             if (profileImage != null && !profileImage.isEmpty()) {
-                // 프로필 이미지 업로드
                 finalProfileImage = uploadProfileImage(profileImage);
             }
 
-            // 6. 사용자 정보 업데이트
+            // 6. 사용자 정보 업데이트 (uniform null=keep) — nickname/birthDate/gender/profileImage 순
             user.updateNickname(finalNickname);
+            if (birthDate != null && birthDate.isAfter(LocalDate.now(KST))) {
+                throw new CommonException(ErrorCode.INVALID_INPUT_VALUE, "생년월일은 미래 날짜일 수 없습니다.");
+            }
+            user.updateBirthDate(birthDate);   // null이면 기존 유지
+            user.updateGender(gender);         // null이면 기존 유지
             user.updateProfileImage(finalProfileImage);
             user.updateRole(ERole.USER);
 
@@ -425,11 +398,10 @@ public class AuthService {
             log.info("회원가입 완료 - 사용자 ID: {}, 닉네임: {}, 권한: {}, 새 토큰 발급",
                     savedUser.getId(), savedUser.getNickname(), savedUser.getRole());
 
-            return RegisterResponseDto.of(
+            // 회원가입 후 변경값(nickname/profileImage)은 응답에 불필요 — SocialLoginResponseDto 재사용
+            return SocialLoginResponseDto.of(
                     savedUser.getId(),
-                    savedUser.getRole().toString(),
-                    savedUser.getNickname(),
-                    s3PresignedUrlService.resolveProfileImageUrl(savedUser.getProfileImage()),
+                    savedUser.getRole(),
                     jwtTokenDto.getAccessToken(),
                     jwtTokenDto.getRefreshToken()
             );
@@ -440,6 +412,34 @@ public class AuthService {
             log.error("회원가입 처리 중 예상치 못한 오류: {}", e.getMessage(), e);
             throw new CommonException(ErrorCode.INTERNAL_SERVER_ERROR);
         }
+    }
+
+    /**
+     * 회원가입 화면 prefill 조회.
+     * nickname/birthDate/gender는 저장값 그대로, profileImage는 기본 이미지·미보유 시 null로 정규화한다.
+     */
+    @Transactional(readOnly = true)
+    public RegisterProfileResponseDto getRegisterProfile(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new CommonException(ErrorCode.USER_NOT_FOUND));
+        return RegisterProfileResponseDto.of(
+                user.getNickname(),
+                user.getBirthDate(),
+                user.getGender(),
+                resolvePrefillProfileImage(user.getProfileImage())
+        );
+    }
+
+    /**
+     * 프리필용 프로필 이미지 변환.
+     * 기본 이미지(default.png)/미보유(null/blank) → null (애플·미동의 → 화면 기본값 노출).
+     * 그 외(카카오 외부 URL / 업로드 S3 key) → presigned/원본 URL 변환.
+     */
+    private String resolvePrefillProfileImage(String stored) {
+        if (stored == null || stored.isBlank() || Constant.DEFAULT_PROFILE_IMAGE.equals(stored)) {
+            return null;
+        }
+        return s3PresignedUrlService.resolveProfileImageUrl(stored);
     }
 
     /**

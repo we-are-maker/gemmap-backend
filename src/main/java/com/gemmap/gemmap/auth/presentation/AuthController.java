@@ -3,8 +3,10 @@ package com.gemmap.gemmap.auth.presentation;
 import com.gemmap.gemmap.auth.application.dto.request.AppleLoginRequestDto;
 import com.gemmap.gemmap.auth.application.dto.request.PhotoConsentRequest;
 import com.gemmap.gemmap.auth.application.dto.response.PhotoConsentResponse;
-import com.gemmap.gemmap.auth.application.dto.response.RegisterResponseDto;
+import com.gemmap.gemmap.auth.application.dto.response.RegisterProfileResponseDto;
 import com.gemmap.gemmap.auth.application.dto.response.SocialLoginResponseDto;
+import com.gemmap.gemmap.shared.common.enums.EGender;
+import org.springframework.format.annotation.DateTimeFormat;
 import com.gemmap.gemmap.auth.application.service.AuthService;
 import com.gemmap.gemmap.shared.common.annotation.UserId;
 import com.gemmap.gemmap.shared.common.constants.Constant;
@@ -18,6 +20,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+
+import java.time.LocalDate;
 
 /**
  * 인증 관련 REST API 컨트롤러
@@ -75,15 +79,28 @@ public class AuthController {
      * 닉네임과 프로필 이미지를 업데이트하고 권한을 USER로 변경
      */
     @PostMapping("/register")
-    public ResponseEntity<RegisterResponseDto> register(
+    public ResponseEntity<SocialLoginResponseDto> register(
             @UserId Long userId,
             @RequestParam(value = "nickname", required = false) String nickname,
+            @RequestParam(value = "birthDate", required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate birthDate,
+            @RequestParam(value = "gender", required = false) EGender gender,
             @RequestParam(value = "profileImage", required = false) MultipartFile profileImage) {
-        log.info("회원가입 요청 - 사용자 ID: {}, 닉네임 입력 여부: {}, 프로필 이미지 업로드 여부: {}",
-                userId, nickname != null, profileImage != null && !profileImage.isEmpty());
+        log.info("회원가입 요청 - 사용자 ID: {}, 닉네임 입력: {}, 생일 입력: {}, 성별 입력: {}, 이미지 업로드: {}",
+                userId, nickname != null, birthDate != null, gender != null,
+                profileImage != null && !profileImage.isEmpty());
 
-        RegisterResponseDto response = authService.register(userId, nickname, profileImage);
+        SocialLoginResponseDto response = authService.register(userId, nickname, birthDate, gender, profileImage);
         return ResponseEntity.ok(response);
+    }
+
+    /**
+     * 회원가입 화면 prefill 조회 (GUEST 토큰)
+     */
+    @GetMapping("/register-profile")
+    public ResponseEntity<RegisterProfileResponseDto> getRegisterProfile(@UserId Long userId) {
+        log.info("회원가입 프리필 조회 요청 - 사용자 ID: {}", userId);
+        return ResponseEntity.ok(authService.getRegisterProfile(userId));
     }
 
     /**
