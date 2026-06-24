@@ -21,13 +21,13 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.encrypt.TextEncryptor;
 
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -38,6 +38,7 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.inOrder;
 
 /**
  * 회원가입 프리필 조회(getRegisterProfile) 및 회원가입(register) 서비스 단위 테스트.
@@ -182,94 +183,138 @@ class AuthServiceRegisterTest {
     }
 
     @Nested
-    @DisplayName("카카오 USER 재로그인 — register 확정 gender/birthDate 보호")
-    class KakaoUserRelogin {
+    @DisplayName("register — 입력 검증")
+    class RegisterValidation {
 
         @Test
-        @DisplayName("USER 재로그인 시 카카오 응답 null 이어도 register 확정 gender/birthDate 유지")
-        void userRolePreservesGenderAndBirthDate() {
-            EGender registeredGender = EGender.MALE;
-            LocalDate registeredBirthDate = LocalDate.of(2000, 1, 1);
-
+        @DisplayName("닉네임 미입력 + 기존 닉네임 없을 때 INVALID_INPUT_VALUE 예외")
+        void nullNickname_withNoExistingNickname_throwsInvalidInputValue() {
             User user = mock(User.class);
-            given(user.getRole()).willReturn(ERole.USER);
-            given(user.getGender()).willReturn(registeredGender);
-            given(user.getBirthDate()).willReturn(registeredBirthDate);
-            given(user.getId()).willReturn(TEST_USER_ID);
+            given(userRepository.findById(TEST_USER_ID)).willReturn(Optional.of(user));
+            given(user.isLogin()).willReturn(true);
+            given(user.getRole()).willReturn(ERole.GUEST);
+            given(user.getNickname()).willReturn(null);
 
-            KakaoAccessTokenInfoResponse tokenInfo = mock(KakaoAccessTokenInfoResponse.class);
-            given(tokenInfo.getId()).willReturn(12345L);
-
-            KakaoUserInfoResponse.KakaoAccount account = mock(KakaoUserInfoResponse.KakaoAccount.class);
-            given(account.getGender()).willReturn(null);    // 카카오 응답: 성별 null
-            given(account.getBirthday()).willReturn(null);  // 카카오 응답: 생일 null
-            given(account.getBirthyear()).willReturn(null); // 카카오 응답: 연도 null
-            given(account.getEmail()).willReturn("test@example.com");
-
-            KakaoUserInfoResponse userInfo = mock(KakaoUserInfoResponse.class);
-            given(userInfo.getKakaoAccount()).willReturn(account);
-
-            given(kakaoOAuth2Service.getAccessTokenInfo("kakao-token")).willReturn(tokenInfo);
-            given(kakaoOAuth2Service.getUserInfo("kakao-token")).willReturn(userInfo);
-            given(userRepository.findBySocialIdAndProvider("12345", EProvider.KAKAO)).willReturn(Optional.of(user));
-            given(userRepository.save(user)).willReturn(user);
-            given(jwtUtil.generateTokens(anyLong(), any(ERole.class))).willReturn(
-                    JwtTokenDto.builder().accessToken("at").refreshToken("rt").build()
-            );
-
-            authService.authenticateWithKakaoAccessToken("kakao-token");
-
-            ArgumentCaptor<EGender> genderCaptor = ArgumentCaptor.forClass(EGender.class);
-            ArgumentCaptor<LocalDate> birthDateCaptor = ArgumentCaptor.forClass(LocalDate.class);
-            verify(user).updateKakaoUserInfo(
-                    any(), any(), any(),
-                    genderCaptor.capture(),
-                    any(),
-                    birthDateCaptor.capture()
-            );
-            assertThat(genderCaptor.getValue()).isEqualTo(registeredGender);
-            assertThat(birthDateCaptor.getValue()).isEqualTo(registeredBirthDate);
+            assertThatThrownBy(() -> authService.register(TEST_USER_ID, null, null, null, null))
+                    .isInstanceOf(CommonException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", ErrorCode.INVALID_INPUT_VALUE);
         }
 
         @Test
-        @DisplayName("GUEST 재로그인 시 카카오 응답 값으로 gender/birthDate 최신화")
-        void guestRoleUpdatesGenderAndBirthDate() {
+        @DisplayName("미래 생년월일 입력 시 INVALID_INPUT_VALUE 예외")
+        void futureBirthDate_throwsInvalidInputValue() {
             User user = mock(User.class);
+            given(userRepository.findById(TEST_USER_ID)).willReturn(Optional.of(user));
+            given(user.isLogin()).willReturn(true);
             given(user.getRole()).willReturn(ERole.GUEST);
+            given(user.getNickname()).willReturn("existingNick");
+
+            LocalDate futureBirthDate = LocalDate.now(ZoneId.of("Asia/Seoul")).plusDays(1);
+
+            assertThatThrownBy(() -> authService.register(TEST_USER_ID, null, futureBirthDate, null, null))
+                    .isInstanceOf(CommonException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", ErrorCode.INVALID_INPUT_VALUE);
+        }
+    }
+
+    @Nested
+    @DisplayName("카카오 활성 사용자 재로그인 — register 확정 정보 보호")
+    class KakaoActiveUserRelogin {
+
+        private void setupActiveReloginMocks(User user, ERole role) {
+            given(user.getRole()).willReturn(role);
             given(user.getId()).willReturn(TEST_USER_ID);
 
             KakaoAccessTokenInfoResponse tokenInfo = mock(KakaoAccessTokenInfoResponse.class);
             given(tokenInfo.getId()).willReturn(12345L);
 
-            KakaoUserInfoResponse.KakaoAccount account = mock(KakaoUserInfoResponse.KakaoAccount.class);
-            given(account.getGender()).willReturn("female");  // 카카오 응답: female
-            given(account.getBirthday()).willReturn("0315");  // 카카오 응답: 생일
-            given(account.getBirthyear()).willReturn("1995"); // 카카오 응답: 연도
-            given(account.getEmail()).willReturn("test@example.com");
-
             KakaoUserInfoResponse userInfo = mock(KakaoUserInfoResponse.class);
-            given(userInfo.getKakaoAccount()).willReturn(account);
+            given(userInfo.getKakaoAccount()).willReturn(null);
 
             given(kakaoOAuth2Service.getAccessTokenInfo("kakao-token")).willReturn(tokenInfo);
             given(kakaoOAuth2Service.getUserInfo("kakao-token")).willReturn(userInfo);
             given(userRepository.findBySocialIdAndProvider("12345", EProvider.KAKAO)).willReturn(Optional.of(user));
-            given(userRepository.save(user)).willReturn(user);
             given(jwtUtil.generateTokens(anyLong(), any(ERole.class))).willReturn(
                     JwtTokenDto.builder().accessToken("at").refreshToken("rt").build()
             );
+        }
+
+        @Test
+        @DisplayName("USER 재로그인 시 birthDate/gender 갱신 없음 — register 확정 값 보호")
+        void userRole_noProfileUpdate() {
+            User user = mock(User.class);
+            setupActiveReloginMocks(user, ERole.USER);
 
             authService.authenticateWithKakaoAccessToken("kakao-token");
 
-            ArgumentCaptor<EGender> genderCaptor = ArgumentCaptor.forClass(EGender.class);
-            ArgumentCaptor<LocalDate> birthDateCaptor = ArgumentCaptor.forClass(LocalDate.class);
-            verify(user).updateKakaoUserInfo(
-                    any(), any(), any(),
-                    genderCaptor.capture(),
-                    any(),
-                    birthDateCaptor.capture()
+            verify(user, never()).updateBirthDate(any());
+            verify(user, never()).updateGender(any());
+        }
+
+        @Test
+        @DisplayName("GUEST 재로그인 시 birthDate/gender 갱신 없음 — register에서 최종 확정")
+        void guestRole_noProfileUpdate() {
+            User user = mock(User.class);
+            setupActiveReloginMocks(user, ERole.GUEST);
+
+            authService.authenticateWithKakaoAccessToken("kakao-token");
+
+            verify(user, never()).updateBirthDate(any());
+            verify(user, never()).updateGender(any());
+        }
+    }
+
+    @Nested
+    @DisplayName("카카오 soft-deleted 재가입 — 유예 내/경과 분기")
+    class KakaoSoftDeletedRejoin {
+
+        private void setupSoftDeletedMocks(User softDeletedUser) {
+            KakaoAccessTokenInfoResponse tokenInfo = mock(KakaoAccessTokenInfoResponse.class);
+            given(tokenInfo.getId()).willReturn(12345L);
+
+            KakaoUserInfoResponse userInfo = mock(KakaoUserInfoResponse.class);
+            given(userInfo.getKakaoAccount()).willReturn(null);
+
+            given(kakaoOAuth2Service.getAccessTokenInfo("kakao-token")).willReturn(tokenInfo);
+            given(kakaoOAuth2Service.getUserInfo("kakao-token")).willReturn(userInfo);
+            given(userRepository.findBySocialIdAndProvider("12345", EProvider.KAKAO)).willReturn(Optional.empty());
+            given(userRepository.findSoftDeletedBySocialIdAndProvider("12345", EProvider.KAKAO))
+                    .willReturn(Optional.of(softDeletedUser));
+            given(userRepository.save(softDeletedUser)).willReturn(softDeletedUser);
+            given(softDeletedUser.getId()).willReturn(TEST_USER_ID);
+            given(softDeletedUser.getRole()).willReturn(ERole.GUEST);
+            given(jwtUtil.generateTokens(anyLong(), any(ERole.class))).willReturn(
+                    JwtTokenDto.builder().accessToken("at").refreshToken("rt").build()
             );
-            assertThat(genderCaptor.getValue()).isEqualTo(EGender.FEMALE);
-            assertThat(birthDateCaptor.getValue()).isEqualTo(LocalDate.of(1995, 3, 15));
+        }
+
+        @Test
+        @DisplayName("유예 내 재가입 — recoverUser 호출, resetForRejoin 미호출")
+        void withinGrace_recoverOnly() {
+            User user = mock(User.class);
+            given(user.getDeleteDate()).willReturn(LocalDate.now(ZoneId.of("Asia/Seoul")).minusDays(10));
+            given(user.isGracePeriodExpired(any(int.class))).willReturn(false);
+            setupSoftDeletedMocks(user);
+
+            authService.authenticateWithKakaoAccessToken("kakao-token");
+
+            verify(user).recoverUser();
+            verify(user, never()).resetForRejoin();
+        }
+
+        @Test
+        @DisplayName("유예 경과 재가입 — recoverUser 후 resetForRejoin 호출 (순서 보장)")
+        void expiredGrace_recoverThenReset() {
+            User user = mock(User.class);
+            given(user.getDeleteDate()).willReturn(LocalDate.now(ZoneId.of("Asia/Seoul")).minusDays(40));
+            given(user.isGracePeriodExpired(any(int.class))).willReturn(true);
+            setupSoftDeletedMocks(user);
+
+            authService.authenticateWithKakaoAccessToken("kakao-token");
+
+            var order = inOrder(user);
+            order.verify(user).recoverUser();
+            order.verify(user).resetForRejoin();
         }
     }
 }

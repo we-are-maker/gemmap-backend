@@ -1,5 +1,6 @@
 package com.gemmap.gemmap.auth.domain.entity;
 
+import com.gemmap.gemmap.shared.common.constants.Constant;
 import com.gemmap.gemmap.shared.common.enums.EGender;
 import com.gemmap.gemmap.shared.common.enums.EProvider;
 import com.gemmap.gemmap.shared.common.enums.ERole;
@@ -163,6 +164,39 @@ class UserTest {
             user.updateGender(EGender.FEMALE);
 
             assertThat(user.getGender()).isEqualTo(EGender.FEMALE);
+        }
+    }
+
+    @Nested
+    @DisplayName("resetForRejoin — 유예 경과 재가입 초기화")
+    class ResetForRejoin {
+
+        @Test
+        @DisplayName("회원가입 프리필에 노출될 프로필성 정보를 초기화")
+        void resetProfilePrefillFields() {
+            User user = User.builder()
+                    .socialId("test-social-id")
+                    .eProvider(EProvider.KAKAO)
+                    .role(ERole.USER)
+                    .email("test@example.com")
+                    .name("테스트")
+                    .nickname("oldNick")
+                    .profileImage("profiles/original.jpg")
+                    .gender(EGender.FEMALE)
+                    .ageRange("30-39")
+                    .birthDate(LocalDate.of(1990, 5, 15))
+                    .build();
+            user.agreeToPhotoConsent();
+
+            user.resetForRejoin();
+
+            assertThat(user.getRole()).isEqualTo(ERole.GUEST);
+            assertThat(user.getNickname()).isNull();
+            assertThat(user.getProfileImage()).isEqualTo(Constant.DEFAULT_PROFILE_IMAGE);
+            assertThat(user.getGender()).isNull();
+            assertThat(user.getAgeRange()).isNull();
+            assertThat(user.getBirthDate()).isNull();
+            assertThat(user.hasPhotoConsentAgreed()).isFalse();
         }
     }
 }
